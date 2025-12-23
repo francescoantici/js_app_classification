@@ -1,0 +1,2 @@
+TASK DEFINITION
+You have to classify the application executed by the SCRIPT commands. Do not provide any additional text nor reasoning nor analysis.
