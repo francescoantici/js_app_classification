@@ -1,0 +1,17 @@
+#!/bin/bash
+#PBS -N app_extraction_offline
+#PBS -P <project-id>
+#PBS -l select=1:ngpus=4
+#PBS -l walltime=24:00:00
+#PBS -j oe
+
+enroot create -n nvidia-vllm <project-folder>/nvidia+vllm+25.10-py3.sqsh
+
+enroot start -m <project-folder>/js_app_classification:/workspace/codes -m <project-folder>/data:/workspace/data nvidia-vllm <<EOF
+    cd /workspace/codes
+    pip install -r requirements.txt
+
+    mkdir -p results_offline
+    
+    python app_extraction_offline.py ../data/all_job_scripts.parquet 100000 0 10
+EOF

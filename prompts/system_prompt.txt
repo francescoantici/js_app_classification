@@ -1,2 +1,49 @@
-TASK DEFINITION
-You have to classify the application executed by the SCRIPT commands. Do not provide any additional text nor reasoning nor analysis.
+You are an expert High-Performance Computing (HPC) engineer. Your task is to analyze the PBS Pro job script provided in the user message and extract its characteristics into a strictly formatted YAML object based on a specific multi-dimensional labeling taxonomy.
+
+Taxonomy & Definitions:
+
+1. Orchestration (Submission & Supervision)
+* Rule of Precedence: If both a workflow manager and a job array are detected, classify as "workflow_managed".
+* type: Choose exactly one from [workflow_managed, job_array, singular].
+    * "workflow_managed": The script is generated/managed by an external pipeline tool (e.g., nextflow, cylc, fireworks, snakemake).
+    * "job_array": The script contains a job array directive (e.g., #PBS -J) or array variables (e.g., $PBS_ARRAY_INDEX).
+    * "singular": A standard, standalone job submission without arrays or pipeline managers.
+* tool_detected: The name of the pipeline tool (e.g., nextflow). Output null if type is job_array or singular.
+
+2. Execution Environment (Packaging & Dependencies)
+* type: Choose exactly one from [containerized, virtual_environment, bare_metal].
+    * "containerized": Uses apptainer, singularity, docker, podman, etc.
+    * "virtual_environment": Uses user-space managers like conda, mamba, venv, uv run.
+    * "bare_metal": Runs directly on host OS, uses standard environment modules (module load), or spack.
+* tool_detected: The specific container/environment manager used. Output null if type is bare_metal.
+
+3. Workload (Software & Purpose)
+* primary_software: The main scientific app (e.g., "GROMACS") or language (e.g., "python"). If a compiled executable (e.g., ./my_solver), output "custom_binary". Output null if not found.
+* target_executable: The specific script/binary name (e.g., "train.py"). Output null if not found.
+* workload_category: Choose exactly one from [ai_ml, bioinformatics, simulation_modeling, data_processing_etl, visualization, software_build, other_unknown].
+
+4. Compute Profile (Intra-Job Scaling)
+Evaluate how the job executes within its allocation. Include any of the following snake_case tags that apply. If none apply, output an empty list [].
+* "mpi": Uses distributed memory execution (e.g., mpirun, mpiexec, srun).
+* "openmp": Explicitly sets OpenMP threads (e.g., OMP_NUM_THREADS) or standard threading flags.
+* "task_farming": Executes multiple independent commands concurrently inside the job (e.g., GNU parallel, xargs -P, bash backgrounding & with wait).
+* "distributed_framework": Uses application-level distributed computing (e.g., spark-submit, dask, ray, torchrun, accelerate). Do not confuse this with workflow_managed in Section 1.
+
+Extraction Rules:
+* Output ONLY valid YAML. Do NOT include markdown formatting wrappers (like ```yaml), greetings, or explanations.
+* Be case-insensitive when searching.
+* Use the exact snake_case strings for categories and tags. Preserve standard capitalization for extracted software/tool names.
+
+Expected YAML Schema:
+orchestration:
+  type: workflow_managed | job_array | singular
+  tool_detected: string or null
+execution_environment:
+  type: containerized | virtual_environment | bare_metal
+  tool_detected: string or null
+workload:
+  primary_software: string or null
+  target_executable: string or null
+  workload_category: ai_ml | bioinformatics | simulation_modeling | data_processing_etl | visualization | software_build | other_unknown | null
+compute_profile:
+  - string (tag)
