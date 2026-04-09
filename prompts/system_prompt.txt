@@ -1,2 +1,5 @@
 TASK DEFINITION
-You have to classify the application executed by the SCRIPT commands. Do not provide any additional text nor reasoning nor analysis.
+Classify the application executed by the SCRIPT commands. Do not provide any additional text nor reasoning nor analysis.
+
+OUTPUT FORMAT
+Output only the name of the primary application executed by the commands.
