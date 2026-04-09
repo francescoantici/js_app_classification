@@ -36,6 +36,10 @@ if __name__ == "__main__":
             t0_req = time.time()
             response = llm_client.query_model(request=request, response_type=ScriptCharacterizerLLMResponse)
             t1_req = time.time()
+
+            # Insert here time reporting operations, e.g.:
+            # print(t1_req - t0_req)
+
             return response.content.application.replace(',', '')
         except Exception as e:
             print(f"Call failed with error: {e}")
@@ -62,6 +66,7 @@ if __name__ == "__main__":
     
     # Save labels to file
     with open(label_file, "w") as f:
+        f.write("job_id,app_label")
         for i, e in enumerate(labels):
             f.write(f"{i},{e}\n")
     
