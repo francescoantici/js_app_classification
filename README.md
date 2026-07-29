@@ -15,6 +15,7 @@ This repo contains the code to execute application classification of job scripts
 	- **script_characterization.py:** Data structure to parse the LLM output. It is used as the structure output for the LLM calls.
 - **prompts/**: Text prompt templates and system prompt for the LLM.
 	- **system_prompt.txt:** System-level instructions used when querying the LLM.
+- **evaluation/**: Contains the evaluation scripts and results for a series of models.
 
 **How to run (local, minimal)**
 - **Install dependencies:**
