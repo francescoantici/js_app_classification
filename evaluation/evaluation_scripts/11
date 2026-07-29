@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --job_name=jax_neural_ode
+#SBATCH --partition=gpu
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=48
+#SBATCH --gres=gpu:a100:8
+#SBATCH --time=72:00:00
+
+export JAX_PLATFORM_NAME=tpu
+export TPU_VISIBLE_DEVICES=0,1,2,3
+
+python train_jax_tpu.py     --model=transformer     --layers=24     --checkpoint_gradients     --batch-size=64

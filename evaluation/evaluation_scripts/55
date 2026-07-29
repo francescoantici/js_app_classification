@@ -1,0 +1,63 @@
+#!/bin/bash
+#SBATCH --job-name=cfd_hybrid
+#SBATCH --partition=compute
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=4        # 4 MPI ranks per node
+#SBATCH --cpus-per-task=16         # 16 OpenMP threads per rank
+#SBATCH --time=36:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Hybrid MPI+OpenMP CFD simulation with explicit NUMA-aware
+# process/thread binding for performance, plus a periodic
+# restart-file sweep to bound scratch usage.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs restarts
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OMP_PLACES=cores
+export OMP_PROC_BIND=close
+export OMP_STACKSIZE=512M
+
+echo "=== Hybrid config ==="
+echo "Nodes: $SLURM_JOB_NUM_NODES | MPI ranks/node: $SLURM_NTASKS_PER_NODE | Threads/rank: $OMP_NUM_THREADS"
+
+CASE_DIR="/projects/myuser/cfd/turbine_case"
+cd "$CASE_DIR"
+
+# ---- Determine whether this is a fresh start or a restart ----
+LATEST_RESTART=$(ls -t restarts/*.rst 2>/dev/null | head -n1 || true)
+RESTART_FLAG=""
+if [ -n "$LATEST_RESTART" ]; then
+    echo "Restarting from: $LATEST_RESTART"
+    RESTART_FLAG="--restart ${LATEST_RESTART}"
+else
+    echo "Starting fresh run"
+fi
+
+# ---- Launch with explicit binding ----
+srun --mpi=pmix \
+     --cpu-bind=cores \
+     --distribution=block:block \
+     ./bin/cfd_solver \
+     --config turbine.cfg \
+     $RESTART_FLAG \
+     --restart-every 3600 \
+     --restart-dir ./restarts \
+     --max-restarts-kept 3
+
+# ---- Prune old restart files, keep the most recent 3 ----
+cd restarts
+ls -t *.rst 2>/dev/null | tail -n +4 | xargs -r rm -f
+cd ..
+
+echo "CFD run segment complete at $(date)"
+echo "Check convergence log to decide whether resubmission is needed:"
+echo "  tail -n 20 convergence.log"

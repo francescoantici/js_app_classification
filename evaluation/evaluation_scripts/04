@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=rnaseq_pipeline
+#SBATCH --partition=workflow
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
+#SBATCH --time=24:00:00
+
+module load nextflow/23.04.0
+
+nextflow run rnaseq_pipeline.nf     -profile docker     --reads 'data/*_R{1,2}.fastq.gz'     --genome GRCh38     --outdir results/     -with-report execution_report.html

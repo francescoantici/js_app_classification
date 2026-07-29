@@ -1,0 +1,77 @@
+#!/bin/bash
+#SBATCH --job-name=slepc_eigen
+#SBATCH --partition=compute
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=12:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Large sparse eigenvalue problem (e.g. lowest vibrational
+# modes of a large FE mesh, or a tight-binding Hamiltonian)
+# solved with SLEPc's Krylov-Schur solver on top of PETSc's
+# distributed sparse matrix infrastructure. Includes a
+# weak-scaling benchmark mode across MPI rank counts.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load petsc/3.20.0
+module load slepc/3.20.0
+
+CASE_DIR="/projects/myuser/eigen/large_hamiltonian"
+cd "$CASE_DIR"
+
+MATRIX_FILE="hamiltonian_2M.petsc"
+N_EIGENVALUES=50
+
+echo "=== SLEPc eigensolver job: $SLURM_NTASKS ranks ==="
+
+if [ "${SCALING_STUDY:-0}" = "1" ]; then
+    echo "Running weak/strong-scaling benchmark"
+    for NP in 8 16 32 64 128; do
+        echo "--- $NP ranks ---"
+        srun -n "$NP" ./eigensolver \
+            -f "$MATRIX_FILE" \
+            -eps_nev "$N_EIGENVALUES" \
+            -eps_type krylovschur \
+            -st_type sinvert \
+            -st_ksp_type preonly \
+            -st_pc_type cholesky \
+            -st_pc_factor_mat_solver_type mumps \
+            -log_view :scaling_${NP}ranks.log
+    done
+    exit 0
+fi
+
+# ---- Production eigenvalue solve: interior eigenvalues via shift-invert ----
+srun --mpi=pmix ./eigensolver \
+    -f "$MATRIX_FILE" \
+    -eps_nev "$N_EIGENVALUES" \
+    -eps_type krylovschur \
+    -eps_target 0.0 \
+    -eps_which target_magnitude \
+    -st_type sinvert \
+    -st_ksp_type preonly \
+    -st_pc_type cholesky \
+    -st_pc_factor_mat_solver_type mumps \
+    -eps_tol 1e-10 \
+    -eps_max_it 500 \
+    -eps_monitor \
+    -log_view :results/solver_performance.log \
+    > results/eigenvalues_output.txt
+
+# ---- Verify convergence ----
+CONVERGED=$(grep -c "CONVERGED" results/eigenvalues_output.txt || true)
+echo "Converged eigenpairs: $CONVERGED / $N_EIGENVALUES"
+
+if [ "$CONVERGED" -lt "$N_EIGENVALUES" ]; then
+    echo "[WARN] Not all requested eigenpairs converged. Consider more iterations or better preconditioner."
+fi
+
+echo "=== Job finished: $(date) ==="

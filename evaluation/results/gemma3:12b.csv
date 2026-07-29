@@ -1,0 +1,99 @@
+jid,path,application,inf_time
+1,scripts/01,vasp,4.103450059890747
+2,scripts/02,gromacs,0.7965149879455566
+3,scripts/03,gpu scripts,0.6897792816162109
+4,scripts/04,rnaseq pipeline,0.7220180034637451
+5,scripts/05,molecular dynamics,0.7787199020385742
+6,scripts/06,chemistry simulation,0.6952700614929199
+7,scripts/07,climate analysis,0.6350712776184082
+8,scripts/08,snakemake,0.8125360012054443
+9,scripts/09,data transfer,0.823803186416626
+10,scripts/10,openfoam,0.737922191619873
+11,scripts/11,gpu scripts,0.7754850387573242
+12,scripts/12,spark,0.7982020378112793
+13,scripts/13,chemistry simulation,0.6879417896270752
+14,scripts/14,chemistry simulation,0.5925729274749756
+15,scripts/15,gpu scripts,0.6452512741088867
+16,scripts/16,chemistry simulation,0.7990620136260986
+17,scripts/17,vasp,0.7204411029815674
+18,scripts/18,wrf-ensemble,0.6583638191223145
+19,scripts/19,machine learning,0.6533997058868408
+20,scripts/20,molecular dynamics,0.6053009033203125
+21,scripts/21,molecular dynamics,0.7305731773376465
+22,scripts/22,metagenomics pipeline,0.7465188503265381
+23,scripts/23,chemistry simulation,0.6390562057495117
+24,scripts/24,snakemake,0.9681038856506348
+25,scripts/25,chemistry simulation,0.7860031127929688
+26,scripts/26,climate,0.7656090259552002
+27,scripts/27,jupyter notebook,0.7689778804779053
+28,scripts/28,molecular dynamics,0.8149330615997314
+29,scripts/29,image reconstruction,0.7959799766540527
+30,scripts/30,chemistry simulation,0.6419100761413574
+31,scripts/31,data processing,0.7307431697845459
+32,scripts/32,proteomics,0.7378659248352051
+33,scripts/33,astro,0.7170889377593994
+34,scripts/34,nuclear simulation,0.8298649787902832
+35,scripts/35,image reconstruction,0.8036572933197021
+36,scripts/36,heat equation,0.7286698818206787
+37,scripts/37,chemistry simulation,0.7241542339324951
+38,scripts/38,pytorch-geometric,0.680185079574585
+39,scripts/39,nwp,0.635138988494873
+40,scripts/40,scrnaseq pipeline,0.6953608989715576
+41,scripts/41,openfoam,0.7759220600128174
+42,scripts/42,seismic inversion,0.7781517505645752
+43,scripts/43,molecular dynamics,0.7309088706970215
+44,scripts/44,chemistry simulation,0.7633969783782959
+45,scripts/45,molecular biology,0.6889197826385498
+46,scripts/46,wrf,0.7676060199737549
+47,scripts/47,data transfer,0.7801039218902588
+48,scripts/48,gpu scripts,0.638725996017456
+49,scripts/49,cfd,0.7612049579620361
+50,scripts/50,bioinformatics,0.8712890148162842
+51,scripts/51,solver,3.8713982105255127
+52,scripts/52,gpu scripts,0.8060588836669922
+53,scripts/53,chemistry simulation,0.8780691623687744
+54,scripts/54,structural biology,0.9518437385559082
+55,scripts/55,openfoam,0.9048759937286377
+56,scripts/56,gpu scripts,0.7393031120300293
+57,scripts/57,salmon,0.7261290550231934
+58,scripts/58,gromacs,0.9435551166534424
+59,scripts/59,chemistry simulation,0.7903621196746826
+60,scripts/60,vasp,0.9608492851257324
+61,scripts/61,chemistry simulation,0.8698620796203613
+62,scripts/62,chemistry simulation,0.9591820240020752
+63,scripts/63,wrf,0.8530616760253906
+64,scripts/64,gadget,0.7512490749359131
+65,scripts/65,lammps,0.8648788928985596
+66,scripts/66,openfoam,0.8538398742675781
+67,scripts/67,nuclear simulation,0.9308888912200928
+68,scripts/68,seismic inversion,0.9397451877593994
+70,scripts/70,cesm,0.8207058906555176
+71,scripts/71,abaqus,0.7913510799407959
+72,scripts/72,meep,0.8901960849761963
+73,scripts/73,molecular dynamics,0.9552948474884033
+74,scripts/74,dns turbulence,0.8794538974761963
+75,scripts/75,nuclear simulation,0.7907779216766357
+76,scripts/76,molecular dynamics,0.8972351551055908
+77,scripts/77,cryo,0.88913893699646
+78,scripts/78,chemistry simulation,0.9570779800415039
+79,scripts/79,geant4 simulation,0.9740853309631348
+80,scripts/80,chemistry simulation,0.9719929695129395
+81,scripts/81,pic simulation,0.8078231811523438
+82,scripts/82,nuclear simulation,0.7644808292388916
+83,scripts/83,ocean simulation,1.1228127479553223
+84,scripts/84,cosmoflow,0.8006489276885986
+85,scripts/85,chemistry simulation,0.9560799598693848
+86,scripts/86,geoclaw,0.9223852157592773
+87,scripts/87,dc-dftb-k_multi,0.9229800701141357
+88,scripts/88,gravitational wave,0.8117849826812744
+89,scripts/89,nwp,0.8567790985107422
+90,scripts/90,numerical relativity,0.8842737674713135
+91,scripts/91,phase,0.8512670993804932
+92,scripts/92,pism,0.8212180137634277
+93,scripts/93,chemistry simulation,0.9502098560333252
+94,scripts/94,openfoam,0.90932297706604
+95,scripts/95,chemistry simulation,0.8266160488128662
+96,scripts/96,radio astronomy,0.7990949153900146
+97,scripts/97,vasp,0.8130218982696533
+99,scripts/99,neuroscience,0.8036386966705322
+100,scripts/100,cryo,4.108879804611206

@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=spark_cybersecurity
+#SBATCH --partition=bigdata
+#SBATCH --nodes=50
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=32
+#SBATCH --mem-per-cpu=1G
+#SBATCH --time=12:00:00
+
+module load spark/3.4.0
+
+spark-submit     --master yarn     --deploy-mode cluster     --executor-memory 32G     --num-executors 50     --conf spark.executor.cores=8     process_logs.py     --input s3a://logs/2024/     --output hdfs://analytics/cybersecurity/     --algorithm=threat_detection

@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=chipseq_pipeline
+#SBATCH --partition=workflow
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=128G
+#SBATCH --time=72:00:00
+
+module load snakemake/7.32.0
+
+snakemake -j 100     --cluster-config cluster.json     --cluster "sbatch --mem={cluster.mem} --time={cluster.time}"     --use-conda     --latency-wait 60

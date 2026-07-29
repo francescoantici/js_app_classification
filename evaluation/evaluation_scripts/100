@@ -1,0 +1,80 @@
+#!/bin/bash
+#SBATCH --job-name=xray_data_reduction
+#SBATCH --partition=compute
+#SBATCH --array=1-48%16
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/xrd_%A_%a.out
+#SBATCH --error=logs/xrd_%A_%a.err
+
+# ============================================================
+# Synchrotron X-ray scattering (SAXS/WAXS) data reduction
+# pipeline: azimuthal integration of raw 2D detector frames
+# into 1D I(q) curves, dark/flat-field correction, and
+# background subtraction. Each array task processes one
+# sample's frame series from a beamtime experiment.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs reduced
+
+module purge
+module load python/3.11
+source activate pyfai_env    # pyFAI + fabio for detector I/O and azimuthal integration
+
+SAMPLE_MANIFEST="beamtime_samples.tsv"   # id  sample_name  frame_pattern  exposure_series_dir
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+LINE=$((TASK_ID + 1))
+read -r ID SAMPLE_NAME FRAME_PATTERN FRAME_DIR <<< "$(sed -n "${LINE}p" "$SAMPLE_MANIFEST")"
+echo "=== Sample $ID: $SAMPLE_NAME ($FRAME_DIR) ==="
+
+OUT_DIR="reduced/${SAMPLE_NAME}"
+mkdir -p "$OUT_DIR"
+
+# ---- Calibration file (detector geometry, from a prior standard measurement) ----
+PONI_FILE="/beamline_data/calibration/detector_2026Q3.poni"
+DARK_FRAME="/beamline_data/calibration/dark_average.edf"
+
+# ---- 1. Azimuthal integration of all frames for this sample ----
+echo "[1/3] Running azimuthal integration"
+python3 - <<EOF
+import pyFAI
+import fabio
+import glob
+import numpy as np
+
+ai = pyFAI.load("${PONI_FILE}")
+dark = fabio.open("${DARK_FRAME}").data
+
+frames = sorted(glob.glob("${FRAME_DIR}/${FRAME_PATTERN}"))
+print(f"Found {len(frames)} frames for ${SAMPLE_NAME}")
+
+for i, frame_path in enumerate(frames):
+    img = fabio.open(frame_path).data.astype(float) - dark
+    q, intensity = ai.integrate1d(img, 1000, unit="q_A^-1",
+                                    correctSolidAngle=True,
+                                    polarization_factor=0.99)
+    np.savetxt(f"${OUT_DIR}/frame_{i:04d}_iq.dat",
+               np.column_stack([q, intensity]),
+               header="q(1/A) I(q)")
+EOF
+
+# ---- 2. Average repeated exposures, subtract buffer/background ----
+echo "[2/3] Averaging frames and subtracting background"
+python3 average_and_subtract_background.py \
+    --frames-dir "$OUT_DIR" \
+    --background-file "/beamline_data/backgrounds/buffer_${SAMPLE_NAME%%_*}.dat" \
+    --output "${OUT_DIR}/${SAMPLE_NAME}_final_iq.dat"
+
+# ---- 3. Basic quality checks: radiation damage, beam stability ----
+echo "[3/3] Checking for radiation damage across frame series"
+python3 check_radiation_damage.py \
+    --frames-dir "$OUT_DIR" \
+    --output "${OUT_DIR}/${SAMPLE_NAME}_damage_check.json"
+
+echo "Sample $ID ($SAMPLE_NAME) done at $(date)"
+# After all samples complete, aggregate for comparison/modeling with:
+#   python3 build_saxs_comparison_plot.py --reduced-dir reduced --output all_samples_iq_comparison.png

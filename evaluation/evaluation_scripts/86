@@ -1,0 +1,77 @@
+#!/bin/bash
+#SBATCH --job-name=tsunami_hazard
+#SBATCH --partition=compute
+#SBATCH --array=1-60%15
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=48G
+#SBATCH --time=08:00:00
+#SBATCH --output=logs/tsunami_%A_%a.out
+#SBATCH --error=logs/tsunami_%A_%a.err
+
+# ============================================================
+# Probabilistic tsunami hazard assessment: GeoClaw adaptive-
+# mesh shallow-water simulation, one array task per earthquake
+# source scenario (magnitude, slip distribution, epicenter)
+# drawn from a stochastic rupture catalog.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results
+
+module purge
+module load gcc/12.2.0
+module load python/3.11
+module load geoclaw/5.10.0
+
+SCENARIO_TABLE="rupture_scenarios.tsv"   # id  magnitude  lat  lon  strike  dip  rake
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+# ---- Generate stochastic rupture catalog once ----
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$SCENARIO_TABLE" ]; then
+    python3 generate_rupture_catalog.py \
+        --fault-zone cascadia \
+        --n-scenarios 60 \
+        --output "$SCENARIO_TABLE"
+fi
+
+for i in {1..20}; do
+    [ -f "$SCENARIO_TABLE" ] && break
+    sleep 3
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID MAG LAT LON STRIKE DIP RAKE <<< "$(sed -n "${LINE}p" "$SCENARIO_TABLE")"
+echo "=== Scenario $ID: M${MAG} at (${LAT}, ${LON}) ==="
+
+SCENARIO_DIR="results/scenario_${ID}"
+mkdir -p "$SCENARIO_DIR"
+cd "$SCENARIO_DIR"
+
+# ---- Generate seafloor deformation (Okada model) for this rupture ----
+python3 ../../compute_okada_deformation.py \
+    --magnitude "$MAG" --lat "$LAT" --lon "$LON" \
+    --strike "$STRIKE" --dip "$DIP" --rake "$RAKE" \
+    --output dtopo.tt3
+
+# ---- Set up GeoClaw run directory (bathymetry, AMR settings) ----
+cp ../../setrun_template.py setrun.py
+cp ../../setplot.py .
+sed -i "s/@DTOPO_FILE@/dtopo.tt3/" setrun.py
+
+# ---- Run GeoClaw shallow-water solver with AMR ----
+python3 ../../run_geoclaw.py \
+    --setrun setrun.py \
+    --output-dir _output \
+    --num-threads "$SLURM_CPUS_PER_TASK"
+
+# ---- Extract max wave height / arrival time at coastal gauges ----
+python3 ../../extract_gauge_hazard.py \
+    --output-dir _output \
+    --gauges ../../coastal_gauges.txt \
+    --result "hazard_summary_${ID}.json"
+
+echo "Scenario $ID done at $(date)"
+cd ../..
+# After all 60 scenarios complete, build the hazard curve with:
+#   python3 build_probabilistic_hazard_curve.py --results-dir results --output tsunami_hazard_curves.csv

@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=composite_fea
+#SBATCH --partition=matlab
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=512G
+#SBATCH --time=48:00:00
+
+module load matlab/R2023b
+
+matlab -batch     "composite_fea('mesh_file','composite_geometry.inp','temperature',150,'output','stress_analysis.mat')"     -singleCompThread -nojvm

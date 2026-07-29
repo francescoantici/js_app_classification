@@ -1,0 +1,84 @@
+#!/bin/bash
+#SBATCH --job-name=combustion_dns
+#SBATCH --partition=compute
+#SBATCH --nodes=32
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=36:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Direct Numerical Simulation of turbulent premixed combustion
+# with detailed finite-rate chemistry (e.g. PeleC/S3D-style
+# compressible reacting-flow solver). Detailed chemical
+# kinetics dominate the per-cell cost, so this uses very high
+# rank counts relative to grid size. Chains by flame time.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs plotfiles checkpoints
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load hdf5/1.14.0-mpi
+module load sundials/6.7.0
+module load amrex/24.06
+
+CASE_DIR="/projects/myuser/combustion/premixed_h2_air_dns"
+cd "$CASE_DIR"
+
+TARGET_FLAME_TIMES=10
+FLAME_TIMES_PER_SEGMENT=1
+
+echo "=== Combustion DNS segment: $(date) ==="
+echo "Ranks: $SLURM_NTASKS"
+
+# ---- Restart detection ----
+LATEST_CHK=$(ls -d checkpoints/chk[0-9]* 2>/dev/null | sort -V | tail -n1 || true)
+if [ -n "$LATEST_CHK" ]; then
+    echo "Restarting from: $LATEST_CHK"
+    RESTART_LINE="amr.restart = ${LATEST_CHK}"
+else
+    echo "Starting fresh with laminar flame + turbulence superposition ICs"
+    RESTART_LINE=""
+fi
+
+cat > inputs_segment <<EOF
+max_step = 1000000
+pelec.chem_integrator = "ReactorCvode"
+pelec.chemistry = "h2_burke_mechanism"
+pelec.do_react = 1
+pelec.do_les = 0
+
+amr.n_cell = 512 512 512
+amr.max_level = 2
+
+pelec.fixed_dt = 2.0e-9
+amr.check_int = 500
+amr.check_file = checkpoints/chk
+amr.plot_int = 1000
+amr.plot_file = plotfiles/plt
+${RESTART_LINE}
+EOF
+
+# ---- Run the reacting-flow solver ----
+srun --mpi=pmix ./PeleC3d.gnu.MPI.ex inputs_segment
+
+# ---- Determine current flame time from latest checkpoint metadata ----
+LATEST_CHK=$(ls -d checkpoints/chk[0-9]* | sort -V | tail -n1)
+CURRENT_FLAME_TIME=$(python3 extract_flame_time.py --checkpoint "$LATEST_CHK")
+echo "Flame times elapsed: $CURRENT_FLAME_TIME / $TARGET_FLAME_TIMES"
+
+if awk -v c="$CURRENT_FLAME_TIME" -v t="$TARGET_FLAME_TIMES" 'BEGIN{exit !(c < t)}'; then
+    echo "Target not reached - resubmitting next segment"
+    sbatch "$0"
+else
+    echo "Target flame-time duration reached."
+    module load python/3.11
+    python3 compute_turbulent_flame_speed.py \
+        --plotfile-dir plotfiles \
+        --output analysis/flame_speed_statistics.json
+fi
+
+echo "=== Segment finished: $(date) ==="

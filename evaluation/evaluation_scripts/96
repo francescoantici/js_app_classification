@@ -1,0 +1,69 @@
+#!/bin/bash
+#SBATCH --job-name=pulsar_search
+#SBATCH --partition=compute
+#SBATCH --array=1-100%25
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=03:00:00
+#SBATCH --output=logs/pulsar_%A_%a.out
+#SBATCH --error=logs/pulsar_%A_%a.err
+
+# ============================================================
+# Radio astronomy pulsar search pipeline (PRESTO-style):
+# de-disperses raw filterbank data across a grid of trial
+# dispersion measures (DM), then searches each de-dispersed
+# time series for periodic and single-pulse signals. Each
+# array task handles one DM trial.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs dedispersed candidates
+
+module purge
+module load presto/5.0.3
+module load python/3.11
+
+RAW_DATA="/projects/myuser/radio_astronomy/obs_20260715/beam03.fil"
+DM_TABLE="dm_trials.tsv"    # id  dm_pc_cm3
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+# ---- Generate DM trial grid once (non-linear spacing per PRESTO DDplan) ----
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$DM_TABLE" ]; then
+    DDplan.py -o ddplan -d 1000 -n 4096 -f 1400 -b 400 -t 6.4e-5 > ddplan_output.txt
+    python3 parse_ddplan_to_trials.py --ddplan-file ddplan_output.txt --output "$DM_TABLE"
+fi
+
+for i in {1..15}; do
+    [ -f "$DM_TABLE" ] && break
+    sleep 2
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID DM <<< "$(sed -n "${LINE}p" "$DM_TABLE")"
+echo "=== DM trial $ID: DM = ${DM} pc/cm^3 ==="
+
+# ---- 1. De-disperse the raw filterbank at this trial DM ----
+prepsubband -o "dedispersed/beam03_DM${DM}" \
+    -dm "$DM" -numdms 1 \
+    -nsub 128 -downsamp 1 \
+    "$RAW_DATA"
+
+# ---- 2. FFT-based periodicity search ----
+realfft "dedispersed/beam03_DM${DM}.dat"
+accelsearch -zmax 200 -numharm 8 "dedispersed/beam03_DM${DM}.fft"
+
+# ---- 3. Single-pulse (non-periodic burst) search ----
+single_pulse_search.py "dedispersed/beam03_DM${DM}.dat"
+
+# ---- Copy any candidates above threshold to shared candidates directory ----
+if ls "dedispersed/beam03_DM${DM}_ACCEL_"* >/dev/null 2>&1; then
+    cp "dedispersed/beam03_DM${DM}_ACCEL_"* candidates/
+fi
+if ls "dedispersed/beam03_DM${DM}"*.singlepulse >/dev/null 2>&1; then
+    cp "dedispersed/beam03_DM${DM}"*.singlepulse candidates/
+fi
+
+echo "DM trial $ID (DM=$DM) done at $(date)"
+# After all DM trials complete, sift and rank candidates with:
+#   python3 sift_pulsar_candidates.py --candidates-dir candidates --output ranked_candidates.csv

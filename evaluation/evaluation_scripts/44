@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=orca_excited
+#SBATCH --partition=quantum
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8
+#SBATCH --mem=64GB
+#SBATCH --time=72:00:00
+
+module load orca/5.0.4
+
+export PAL=8
+export MAXCORE=4000
+
+orca excited_states.inp > excited_states.out

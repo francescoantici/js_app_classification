@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --job-name=ml_pipeline
+#SBATCH --partition=ai
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=256G
+#SBATCH --time=24:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+export STAGE1='python generate_structures.py --nconfigs=100'
+export TRAIN_ARGS='--model xgboost --iterations 500'
+export EVAL_ARGS='--metrics auc,accuracy'
+
+./ml_pipeline.sh stage=full $PREPROCESS_ARGS $TRAIN_ARGS $EVAL_ARGS

@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=climate_analysis
+#SBATCH --partition=serial
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=256G
+#SBATCH --time=12:00:00
+
+module load R/4.3.0
+
+Rscript climate_analysis.R     --input-dir=/data/cmip6     --variable=temperature     --region=global     --output=figures/climate_trends.pdf

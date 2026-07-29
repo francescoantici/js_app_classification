@@ -1,0 +1,79 @@
+#!/bin/bash
+# ============================================================
+# Driver for an Ensemble Kalman Filter (EnKF) data assimilation
+# cycle: repeatedly (1) runs an N-member ensemble forecast
+# forward to the next observation time, (2) assimilates
+# observations to produce an analysis ensemble, then feeds
+# that analysis back in as the next cycle's initial condition.
+# Run from login node: bash 40_enkf_data_assimilation_cycle.sh
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs ensemble analysis
+
+N_MEMBERS=80
+N_CYCLES=24              # e.g. 24 six-hourly cycles = 6 days
+CYCLE_HOURS=6
+
+echo "=== Starting EnKF cycling: ${N_CYCLES} cycles of ${N_MEMBERS} members ==="
+
+PREV_JOBID=""
+for CYCLE in $(seq 1 "$N_CYCLES"); do
+    echo "--- Cycle $CYCLE ---"
+
+    # ---- Forecast step: N-member ensemble array job, advances each member ----
+    DEP_FLAG=""
+    if [ -n "$PREV_JOBID" ]; then
+        DEP_FLAG="--dependency=afterok:${PREV_JOBID}"
+    fi
+
+    FCST_JOBID=$(sbatch --parsable $DEP_FLAG \
+        --job-name="enkf_fcst_c${CYCLE}" \
+        --partition=compute \
+        --array=1-${N_MEMBERS}%40 \
+        --nodes=1 --ntasks-per-node=16 \
+        --time=01:30:00 \
+        --output=logs/%x_%A_%a.out --error=logs/%x_%A_%a.err \
+        --wrap="
+            set -euo pipefail
+            module load wrf/4.5.2
+            MEM=\$(printf '%03d' \$SLURM_ARRAY_TASK_ID)
+            mkdir -p ensemble/mem_\${MEM}
+            cd ensemble/mem_\${MEM}
+            ln -sf ../../analysis/cycle_$((CYCLE - 1))/mem_\${MEM}_analysis.nc wrfinput_d01 2>/dev/null || \
+                ln -sf ../../ensemble_init/mem_\${MEM}_init.nc wrfinput_d01
+            srun --mpi=pmix ./wrf.exe
+            cp wrfout_d01_* ../../ensemble/forecast_c${CYCLE}_mem_\${MEM}.nc
+        ")
+    echo "  Forecast (cycle $CYCLE) submitted: $FCST_JOBID"
+
+    # ---- Analysis step: EnKF update using observations valid at this cycle time ----
+    ANA_JOBID=$(sbatch --parsable \
+        --dependency=afterok:${FCST_JOBID} \
+        --job-name="enkf_analysis_c${CYCLE}" \
+        --partition=compute \
+        --ntasks=32 \
+        --mem=128G \
+        --time=00:45:00 \
+        --output=logs/%x_%j.out --error=logs/%x_%j.err \
+        --wrap="
+            set -euo pipefail
+            module load python/3.11
+            mkdir -p analysis/cycle_${CYCLE}
+            srun --mpi=pmix python3 run_enkf_update.py \
+                --forecast-dir ensemble \
+                --forecast-pattern 'forecast_c${CYCLE}_mem_*.nc' \
+                --obs-file observations/obs_cycle_${CYCLE}.nc \
+                --n-members ${N_MEMBERS} \
+                --inflation adaptive \
+                --localization-radius-km 500 \
+                --output-dir analysis/cycle_${CYCLE}
+        ")
+    echo "  Analysis (cycle $CYCLE) submitted: $ANA_JOBID"
+
+    PREV_JOBID=$ANA_JOBID
+done
+
+echo "=== Full EnKF cycling chain submitted (${N_CYCLES} cycles) ==="
+echo "Final analysis job: $PREV_JOBID"
+echo "Monitor with: squeue -u \$USER"

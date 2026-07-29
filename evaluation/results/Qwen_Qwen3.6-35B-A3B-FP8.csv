@@ -1,0 +1,100 @@
+jid,path,application,inf_time
+1,scripts/01,vasp,1.4807960987091064
+2,scripts/02,gromacs,0.9562277793884277
+3,scripts/03,gpu scripts,4.467919111251831
+4,scripts/04,bioinformatics,11.055293083190918
+5,scripts/05,lammps,1.614729881286621
+6,scripts/06,deep learning,5.265945196151733
+7,scripts/07,atmospheric general circu,5.8080809116363525
+8,scripts/08,snakemake,4.247735023498535
+9,scripts/09,rsync,4.102392911911011
+10,scripts/10,openfoam,1.0501551628112793
+11,scripts/11,deep learning,6.478101968765259
+12,scripts/12,demo,6.59198522567749
+13,scripts/13,matlab,4.4462339878082275
+14,scripts/14,chemistry simulation,2.187870979309082
+15,scripts/15,deep learning,6.9187912940979
+16,scripts/16,material science,4.805768966674805
+17,scripts/17,vasp,0.948350191116333
+18,scripts/18,nwp,6.425156831741333
+19,scripts/19,gpu scripts,7.8917717933654785
+20,scripts/20,molecular dynamics,2.9705049991607666
+21,scripts/21,molecular dynamics,4.139480113983154
+22,scripts/22,bioinformatics,5.099328994750977
+23,scripts/23,hadron,2.7647740840911865
+24,scripts/24,snakemake,4.683402061462402
+25,scripts/25,data analysis,5.632704973220825
+26,scripts/26,atmospheric general circu,8.555774927139282
+27,scripts/27,jupyter,5.112965106964111
+28,scripts/28,molecular dynamics,2.118447780609131
+29,scripts/29,video processing,8.495424032211304
+30,scripts/30,chemistry simulation,4.135998010635376
+31,scripts/31,image reconstruction,4.984895944595337
+32,scripts/32,chemistry simulation,7.513578414916992
+33,scripts/33,astronomy,9.599351167678833
+34,scripts/34,nuclear physics,4.140275001525879
+35,scripts/35,image reconstruction,5.8324480056762695
+36,scripts/36,hpc code,7.8698060512542725
+37,scripts/37,machine learning,5.2085230350494385
+38,scripts/38,gpu scripts,4.929326772689819
+39,scripts/39,nwp,1.2108008861541748
+40,scripts/40,bioinformatics,5.811964988708496
+41,scripts/41,cfd,6.447321891784668
+42,scripts/42,specx,4.007626056671143
+43,scripts/43,structural biology,3.7880630493164062
+44,scripts/44,chemistry simulation,2.173417091369629
+45,scripts/45,bioinformatics,5.428322076797485
+46,scripts/46,wrf,7.753859043121338
+47,scripts/47,abyss,5.450336933135986
+48,scripts/48,stable-diffusion,4.684570074081421
+49,scripts/49,SU2,4.633383750915527
+50,scripts/50,bioinformatics,5.086605072021484
+51,scripts/51,hpc code,5.780580282211304
+52,scripts/52,gpu scripts,5.404099941253662
+53,scripts/53,chemistry simulation,7.743523120880127
+54,scripts/54,genomics,8.172735214233398
+55,scripts/55,openfoam,7.007272243499756
+56,scripts/56,gpu scripts,6.6356120109558105
+57,scripts/57,salmon,2.1481311321258545
+58,scripts/58,gromacs,0.9177718162536621
+59,scripts/59,demo,8.061105966567993
+60,scripts/60,vasp,0.7749569416046143
+61,scripts/61,condensed matter physics,8.570289850234985
+62,scripts/62,chemistry simulation,3.9234249591827393
+63,scripts/63,atmospheric general circu,6.9164018630981445
+64,scripts/64,cosmoflow,6.004810094833374
+65,scripts/65,lammps,1.375412940979004
+66,scripts/66,openfoam,3.880190849304199
+67,scripts/67,nuclear physics,5.376989841461182
+68,scripts/68,seismic inversion,2.000415086746216
+70,scripts/70,atmospheric general circu,4.40850830078125
+71,scripts/71,abaqus,3.768083095550537
+72,scripts/72,maxwell heis,14.188475131988525
+73,scripts/73,hpc code,6.497365236282349
+74,scripts/74,turbulence simulation,9.4218909740448
+75,scripts/75,flash,6.558084011077881
+76,scripts/76,genomics,5.018511772155762
+77,scripts/77,relion,1.112673044204712
+78,scripts/78,chemistry simulation,2.4276270866394043
+79,scripts/79,nuclear physics,9.220232009887695
+80,scripts/80,molecular dynamics,4.552351951599121
+81,scripts/81,epoch,5.871484756469727
+82,scripts/82,nuclear simulation,3.4545540809631348
+83,scripts/83,mom6,8.011816263198853
+84,scripts/84,cosmoflow,8.86912202835083
+85,scripts/85,PeleC3D,13.122323274612427
+86,scripts/86,seismic inversion,13.973237037658691
+87,scripts/87,condensed matter physics,4.792819023132324
+88,scripts/88,nuclear physics,14.822931051254272
+89,scripts/89,nwp,6.2016441822052
+90,scripts/90,cactus,8.410646915435791
+91,scripts/91,phase,1.7140469551086426
+92,scripts/92,pism,5.628168344497681
+93,scripts/93,opal,8.168568849563599
+94,scripts/94,SU2,6.532061815261841
+95,scripts/95,dakota_uq,8.702102899551392
+96,scripts/96,radio astronomy,8.093828916549683
+97,scripts/97,vasp,1.065885066986084
+98,scripts/98,molecular dynamics,6.8277599811553955
+99,scripts/99,genesis,6.459584951400757
+100,scripts/100,structural biology,9.139011144638062

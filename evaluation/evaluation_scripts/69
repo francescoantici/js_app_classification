@@ -1,0 +1,84 @@
+#!/bin/bash
+# ============================================================
+# Driver for a two-stage protein structure prediction pipeline
+# (AlphaFold2-style): CPU-heavy multiple sequence alignment
+# (MSA) search against genetic databases, followed by GPU
+# structure inference + relaxation. Submitted as dependent
+# jobs since the resource profiles differ drastically.
+# Run from login node: bash 20_protein_folding_pipeline.sh <fasta_file>
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+FASTA_FILE="${1:?Usage: $0 <fasta_file>}"
+TARGET_NAME=$(basename "$FASTA_FILE" .fasta)
+
+echo "=== Stage 1: MSA search (CPU, high I/O) for $TARGET_NAME ==="
+MSA_JOBID=$(sbatch --parsable \
+    --job-name="msa_${TARGET_NAME}" \
+    --partition=compute \
+    --cpus-per-task=32 \
+    --mem=120G \
+    --time=08:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap="
+        set -euo pipefail
+        module load hmmer/3.4
+        module load hhsuite/3.3.0
+        module load jackhmmer/3.4
+
+        mkdir -p msa_output/${TARGET_NAME}
+
+        jackhmmer -N 3 --cpu 32 \
+            -A msa_output/${TARGET_NAME}/uniref90_hits.sto \
+            ${FASTA_FILE} /databases/uniref90/uniref90.fasta
+
+        jackhmmer -N 3 --cpu 32 \
+            -A msa_output/${TARGET_NAME}/mgnify_hits.sto \
+            ${FASTA_FILE} /databases/mgnify/mgy_clusters.fasta
+
+        hhblits -cpu 32 -i ${FASTA_FILE} \
+            -d /databases/bfd/bfd_metaclust \
+            -oa3m msa_output/${TARGET_NAME}/bfd_hits.a3m \
+            -n 3
+    ")
+echo "MSA job submitted: $MSA_JOBID"
+
+echo "=== Stage 2: Structure inference + relaxation (GPU, depends on MSA) ==="
+FOLD_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${MSA_JOBID} \
+    --job-name="fold_${TARGET_NAME}" \
+    --partition=gpu \
+    --gres=gpu:1 \
+    --cpus-per-task=8 \
+    --mem=64G \
+    --time=04:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap="
+        set -euo pipefail
+        module load cuda/12.2
+        module load alphafold/2.3.2
+
+        run_alphafold.py \
+            --fasta_paths=${FASTA_FILE} \
+            --msa_dir=msa_output/${TARGET_NAME} \
+            --model_preset=monomer_ptm \
+            --num_multimer_predictions_per_model=1 \
+            --use_gpu_relax=true \
+            --max_template_date=2024-01-01 \
+            --output_dir=predictions/${TARGET_NAME}
+
+        # Rank models by predicted TM-score and report best
+        python3 -c \"
+import json
+with open('predictions/${TARGET_NAME}/ranking_debug.json') as f:
+    r = json.load(f)
+print('Best model:', r['order'][0], 'pLDDT/pTM:', r.get('plddts', {}).get(r['order'][0]))
+\"
+    ")
+echo "Folding job submitted: $FOLD_JOBID (depends on afterok:${MSA_JOBID})"
+echo "Chain: $MSA_JOBID -> $FOLD_JOBID"
+echo "Predicted structures will appear in predictions/${TARGET_NAME}/"

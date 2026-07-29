@@ -1,0 +1,65 @@
+#!/bin/bash
+#SBATCH --job-name=tf_distributed
+#SBATCH --partition=gpu
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=4          # one task per GPU
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=200G
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Multi-node, multi-GPU distributed training using Horovod
+# over MPI. Sets up NCCL environment variables for optimal
+# interconnect usage and logs only from rank 0.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load cuda/12.2
+module load nccl/2.19
+module load openmpi/4.1.5
+module load anaconda3/2024.02
+source activate horovod_env
+
+# ---- NCCL / network tuning ----
+export NCCL_DEBUG=WARN
+export NCCL_IB_DISABLE=0
+export NCCL_SOCKET_IFNAME=ib0
+export NCCL_ALGO=Ring
+export OMP_NUM_THREADS=8
+
+TOTAL_GPUS=$((SLURM_NNODES * SLURM_NTASKS_PER_NODE))
+echo "=== Distributed training config ==="
+echo "Nodes: $SLURM_NNODES | GPUs/node: $SLURM_NTASKS_PER_NODE | Total GPUs: $TOTAL_GPUS"
+
+# ---- Launch via mpirun + Horovod ----
+mpirun -np "$TOTAL_GPUS" \
+    --map-by ppr:${SLURM_NTASKS_PER_NODE}:node \
+    --bind-to none \
+    -x NCCL_DEBUG -x NCCL_IB_DISABLE -x NCCL_SOCKET_IFNAME -x NCCL_ALGO \
+    -x LD_LIBRARY_PATH -x PATH \
+    python3 train_distributed.py \
+        --data-dir /projects/myuser/datasets/large_corpus \
+        --model transformer_large \
+        --global-batch-size 4096 \
+        --epochs 50 \
+        --checkpoint-dir ./checkpoints \
+        --log-dir ./tb_logs \
+        --fp16
+
+STATUS=$?
+
+# ---- Only rank 0's summary matters; find and print it ----
+if [ $STATUS -eq 0 ]; then
+    echo "=== Training summary (rank 0) ==="
+    tail -n 30 ./tb_logs/rank0.log 2>/dev/null || echo "No rank0 log found"
+else
+    echo "[ERROR] Distributed training failed with status $STATUS" >&2
+fi
+
+exit $STATUS

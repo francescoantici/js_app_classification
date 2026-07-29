@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --job-name=openfoam_wing
+#SBATCH --partition=gpu
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:a100:8
+#SBATCH --time=96:00:00
+
+export FOAM_RUN=/workspace/wing_simulation
+cd $FOAM_RUN
+
+enroot start --mount $FOAM_RUN:/work openfoam-10.sqsh     bash -c "source /opt/OpenFOAM-10/etc/bashrc && decomposePar && simpleFoam -parallel"

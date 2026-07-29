@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=video_preprocess
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64G
+#SBATCH --time=12:00:00
+
+cd /dataset/videos/
+
+ffmpeg -i raw_video.mp4     -vf 'scale=224:224,fps=30'     -c:v libx264     -preset slow     -crf 22     output_%04d.jpg

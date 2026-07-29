@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=gaussian_ts
+#SBATCH --partition=quantum
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=16
+#SBATCH --mem-per-node=64GB
+#SBATCH --time=168:00:00
+
+module load gaussian/g16
+
+export GAUSS_SCRDIR=/scratch/$USER/gaussian
+export GAUSS_MEMDEF=64GB
+
+g16 < catalyst_ts.com > catalyst_ts.log

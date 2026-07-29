@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=resnet50_distributed
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=48
+#SBATCH --gres=gpu:v100:8
+#SBATCH --time=72:00:00
+
+export MASTER_ADDR=$(hostname -s)
+export MASTER_PORT=29500
+
+srun python train_resnet_distributed.py     --batch-size=256     --epochs=100     --lr=0.1     --world-size=4     --dist-backend=nccl

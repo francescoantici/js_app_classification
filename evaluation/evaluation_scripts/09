@@ -1,0 +1,7 @@
+#!/bin/bash
+#SBATCH --job-name=data_sync
+#SBATCH --partition=transfer
+#SBATCH --cpus-per-task=4
+#SBATCH --time=72:00:00
+
+rsync -avh --progress --checksum     --partial-dir=.rsync-partial     /data/experiment_2024/     user@storage.hpc:/backup/experiment_2024/

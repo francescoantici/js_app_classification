@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=namd_metadynamics
+#SBATCH --partition=gpu
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:a100:4
+#SBATCH --time=120:00:00
+
+docker run --rm --gpus all -v $PWD:/data namd-cuda     namd2 +p16 +isomalloc_sync /data/metadynamics.conf     COLVARS_CONFIG=/data/pulling.colvars

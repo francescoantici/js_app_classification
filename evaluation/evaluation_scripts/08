@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=variant_calling
+#SBATCH --partition=workflow
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=128G
+#SBATCH --time=48:00:00
+
+module load snakemake/7.32.0
+
+snakemake     --cores 24     --configfile config.yaml     --use-conda     --conda-prefix /opt/conda_envs     --latency-wait 60

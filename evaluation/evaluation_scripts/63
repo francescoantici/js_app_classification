@@ -1,0 +1,68 @@
+#!/bin/bash
+#SBATCH --job-name=wrf_ensemble
+#SBATCH --partition=compute
+#SBATCH --array=0-31
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=36
+#SBATCH --time=08:00:00
+#SBATCH --output=logs/wrf_%A_%a.out
+#SBATCH --error=logs/wrf_%A_%a.err
+
+# ============================================================
+# WRF regional weather ensemble forecast: 32-member ensemble,
+# each array task perturbs initial/boundary conditions and
+# runs the full WRF forecast independently.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+MEMBER=$(printf "%03d" "$SLURM_ARRAY_TASK_ID")
+MEMBER_DIR="ensemble/mem_${MEMBER}"
+mkdir -p "$MEMBER_DIR"
+cd "$MEMBER_DIR"
+
+echo "=== WRF ensemble member $MEMBER ==="
+
+module purge
+module load netcdf/4.9.2
+module load hdf5/1.14.0
+module load wrf/4.5.2
+
+BASE_DIR="/projects/myuser/wrf/case_2026072800"
+
+# ---- Link static input (shared across members) ----
+ln -sf "${BASE_DIR}/geo_em.d01.nc" .
+ln -sf "${BASE_DIR}/wrfinput_d01_base" wrfinput_d01
+ln -sf "${BASE_DIR}/wrfbdy_d01_base" wrfbdy_d01
+cp "${BASE_DIR}/namelist.input" .
+
+# ---- Perturb initial conditions for this ensemble member ----
+module load python/3.11
+python3 "${BASE_DIR}/scripts/perturb_ic.py" \
+    --input wrfinput_d01 \
+    --seed "$SLURM_ARRAY_TASK_ID" \
+    --perturbation-scale 0.5 \
+    --output wrfinput_d01
+
+# ---- Set unique random seed in namelist for stochastic physics (SPPT) ----
+sed -i "s/^ iseed_skebs.*/ iseed_skebs = ${SLURM_ARRAY_TASK_ID},/" namelist.input
+sed -i "s/^ iseed_sppt.*/ iseed_sppt = $((SLURM_ARRAY_TASK_ID + 1000)),/" namelist.input
+
+# ---- Run WRF ----
+srun --mpi=pmix ./wrf.exe
+
+# ---- Verify success ----
+if grep -q "SUCCESS COMPLETE WRF" rsl.out.0000; then
+    echo "Member $MEMBER completed successfully"
+    mkdir -p "${BASE_DIR}/output/mem_${MEMBER}"
+    cp wrfout_d01_* "${BASE_DIR}/output/mem_${MEMBER}/"
+else
+    echo "[ERROR] Member $MEMBER failed" >&2
+    tail -n 30 rsl.error.0000
+    exit 1
+fi
+
+echo "Member $MEMBER done at $(date)"
+# Once all 32 members finish, submit a separate ensemble-mean/spread job with:
+#   sbatch --dependency=afterok:${SLURM_ARRAY_JOB_ID} ensemble_post.sh

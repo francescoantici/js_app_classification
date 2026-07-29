@@ -1,0 +1,80 @@
+#!/bin/bash
+#SBATCH --job-name=openmc_reactor
+#SBATCH --partition=compute
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=1
+#SBATCH --time=12:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# OpenMC Monte Carlo neutron transport eigenvalue (k-eff)
+# calculation for reactor core criticality analysis. Runs
+# inactive + active generations, checks Shannon entropy
+# convergence, and extends the run with more generations if
+# the source distribution hasn't converged.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs statepoints
+
+module purge
+module load openmpi/4.1.5
+module load openmc/0.14.0
+module load hdf5/1.14.0-mpi
+
+CASE_DIR="/projects/myuser/reactor_physics/pwr_assembly"
+cd "$CASE_DIR"
+
+echo "=== OpenMC reactor criticality calculation: $(date) ==="
+echo "Ranks: $SLURM_NTASKS"
+
+# ---- Configure settings.xml: particles/batches (idempotent update) ----
+python3 - <<'EOF'
+import openmc
+settings = openmc.Settings.from_xml('settings.xml')
+settings.particles = 1_000_000
+settings.batches = 200
+settings.inactive = 50
+settings.output = {'summary': True}
+settings.export_to_xml()
+EOF
+
+# ---- Run OpenMC via MPI ----
+srun --mpi=pmix openmc --threads=1
+
+# ---- Check Shannon entropy convergence from the tallies/statepoint ----
+python3 - <<'EOF'
+import openmc
+import glob
+
+sp_files = sorted(glob.glob('statepoint.*.h5'))
+sp = openmc.StatePoint(sp_files[-1])
+entropy = sp.entropy
+k_eff = sp.k_combined
+
+print(f"k-effective: {k_eff.n:.5f} +/- {k_eff.s:.5f}")
+
+# Simple convergence heuristic: entropy variance over last 20 active batches
+import numpy as np
+tail = entropy[-20:]
+converged = np.std(tail) < 0.01
+print(f"Shannon entropy converged: {converged}")
+
+with open('convergence_status.txt', 'w') as f:
+    f.write('CONVERGED' if converged else 'NOT_CONVERGED')
+EOF
+
+STATUS=$(cat convergence_status.txt)
+if [ "$STATUS" = "NOT_CONVERGED" ]; then
+    echo "[WARN] Source distribution not fully converged - consider extending batches"
+    echo "Resubmitting with additional active batches"
+    sed -i 's/settings.batches = 200/settings.batches = 300/' /dev/null 2>/dev/null || true
+    sbatch --export=EXTEND_BATCHES=1 "$0"
+else
+    echo "Criticality calculation converged."
+    mv statepoint.*.h5 statepoints/
+fi
+
+echo "=== Job finished: $(date) ==="

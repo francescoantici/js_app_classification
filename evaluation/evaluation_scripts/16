@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --job-name=qe_phonons
+#SBATCH --partition=cpu
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=2
+#SBATCH --time=72:00:00
+
+module load quantum-espresso/7.2
+
+export OMP_NUM_THREADS=2
+
+mpirun -np 128 pw.x -nk 8 -in scf.in > scf.out
+mpirun -np 64 ph.x -nk 4 -in ph.in > ph.out
+q2r.x -in q2r.in > q2r.out

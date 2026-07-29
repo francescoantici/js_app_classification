@@ -1,0 +1,84 @@
+#!/bin/bash
+#SBATCH --job-name=hts_materials
+#SBATCH --partition=compute
+#SBATCH --array=1-500%60
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=16
+#SBATCH --time=04:00:00
+#SBATCH --output=logs/hts_%A_%a.out
+#SBATCH --error=logs/hts_%A_%a.err
+
+# ============================================================
+# High-throughput computational materials screening: each
+# array task pulls one candidate structure from a materials
+# database (e.g. a Materials Project-style CIF collection),
+# runs a DFT relaxation + property calculation, and records
+# results to a shared results table for later ranking (e.g.
+# by formation energy, band gap, or elastic modulus).
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results structures
+
+module purge
+module load intel/2023.2
+module load intel-mpi/2021.10
+module load vasp/6.4.2-std
+module load python/3.11
+
+MATERIALS_MANIFEST="candidates.tsv"   # id  formula  cif_path
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$MATERIALS_MANIFEST" ]; then
+    echo "Building candidate manifest from structure database"
+    python3 build_candidate_manifest.py \
+        --database /projects/myuser/materials_db/candidates \
+        --filter "contains_element=Li" \
+        --max-candidates 500 \
+        --output "$MATERIALS_MANIFEST"
+fi
+
+for i in {1..15}; do
+    [ -f "$MATERIALS_MANIFEST" ] && break
+    sleep 2
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID FORMULA CIF_PATH <<< "$(sed -n "${LINE}p" "$MATERIALS_MANIFEST")"
+echo "=== Candidate $ID: $FORMULA ($CIF_PATH) ==="
+
+WORK_DIR="structures/candidate_${ID}"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# ---- Generate VASP inputs from CIF via pymatgen ----
+python3 -c "
+from pymatgen.core import Structure
+from pymatgen.io.vasp.sets import MPRelaxSet
+struct = Structure.from_file('${CIF_PATH}')
+vasp_set = MPRelaxSet(struct)
+vasp_set.write_input('.')
+"
+
+# ---- Run relaxation (skip gracefully if it doesn't converge in budget) ----
+timeout 3h srun --mpi=pmi2 -n "$SLURM_NTASKS" vasp_std > vasp_stdout.log 2>&1 || {
+    echo "[WARN] Candidate $ID timed out or crashed - marking as failed"
+    echo -e "${ID}\t${FORMULA}\tFAILED\tNA\tNA" >> ../../results/screening_results.tsv
+    cd ../..
+    exit 0
+}
+
+# ---- Extract key properties if relaxation succeeded ----
+if grep -q "reached required accuracy" OUTCAR; then
+    FORMATION_E=$(python3 ../../compute_formation_energy.py --outcar OUTCAR --formula "$FORMULA")
+    BAND_GAP=$(python3 ../../compute_band_gap.py --vasprun vasprun.xml)
+    echo -e "${ID}\t${FORMULA}\tCONVERGED\t${FORMATION_E}\t${BAND_GAP}" >> ../../results/screening_results.tsv
+    echo "Candidate $ID: E_form=${FORMATION_E} eV/atom, gap=${BAND_GAP} eV"
+else
+    echo -e "${ID}\t${FORMULA}\tNOT_CONVERGED\tNA\tNA" >> ../../results/screening_results.tsv
+fi
+
+cd ../..
+echo "Candidate $ID done at $(date)"
+# After the full screen completes, rank candidates with:
+#   python3 rank_screening_results.py --input results/screening_results.tsv --output top_candidates.csv

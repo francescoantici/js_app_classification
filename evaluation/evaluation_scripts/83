@@ -1,0 +1,79 @@
+#!/bin/bash
+#SBATCH --job-name=mom6_ocean
+#SBATCH --partition=compute
+#SBATCH --nodes=10
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# MOM6 regional ocean circulation model (e.g. Gulf Stream
+# eddy-resolving configuration). Chains multi-year segments
+# via native restart files, and runs a basic sanity check on
+# sea-surface height / kinetic energy each segment to catch
+# blow-ups early.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs RESTART
+
+module purge
+module load intel/2023.2
+module load intel-mpi/2021.10
+module load netcdf/4.9.2-mpi
+module load fms/2024.01
+
+CASE_DIR="/projects/myuser/mom6/gulf_stream_eddy"
+cd "$CASE_DIR"
+
+TARGET_YEARS=20
+YEARS_PER_SEGMENT=1
+
+echo "=== MOM6 ocean segment: $(date) ==="
+
+# ---- Restart logic ----
+if ls RESTART/*.res.nc >/dev/null 2>&1; then
+    echo "Restarting from existing RESTART files"
+    cp RESTART/*.res* INPUT/
+    CURRENT_YEAR=$(cat RESTART/coupler.res 2>/dev/null | head -n1 | awk '{print $1}' || echo "unknown")
+else
+    echo "Starting fresh from climatological initial conditions"
+    CURRENT_YEAR=0
+fi
+echo "Current model year: $CURRENT_YEAR"
+
+# ---- Run MOM6 for this segment ----
+srun --mpi=pmi2 ./MOM6 > mom6_stdout_${CURRENT_YEAR}.log 2>&1
+
+# ---- Sanity check: look for NaN/blow-up in diagnostics ----
+if grep -qi "NaN" mom6_stdout_${CURRENT_YEAR}.log; then
+    echo "[FATAL] NaN detected in MOM6 output - simulation likely blew up" >&2
+    tail -n 60 mom6_stdout_${CURRENT_YEAR}.log
+    exit 1
+fi
+
+MAX_SPEED=$(grep "MAX Velocity" mom6_stdout_${CURRENT_YEAR}.log | tail -n1 | awk '{print $NF}' || echo "0")
+echo "Max velocity this segment: $MAX_SPEED m/s"
+
+if awk -v v="$MAX_SPEED" 'BEGIN{exit !(v > 5.0)}'; then
+    echo "[WARN] Unusually high velocity detected ($MAX_SPEED m/s) - check for instability"
+fi
+
+# ---- Rotate restart files for next segment ----
+mkdir -p "RESTART_archive/year_${CURRENT_YEAR}"
+cp RESTART/*.res* "RESTART_archive/year_${CURRENT_YEAR}/"
+
+NEW_YEAR=$((CURRENT_YEAR + YEARS_PER_SEGMENT))
+
+if [ "$NEW_YEAR" -lt "$TARGET_YEARS" ]; then
+    echo "Resubmitting for model year $NEW_YEAR"
+    sbatch "$0"
+else
+    echo "Target simulation length reached ($TARGET_YEARS years)."
+    module load python/3.11
+    python3 compute_eddy_kinetic_energy.py \
+        --history-dir . --output analysis/eke_climatology.nc
+fi
+
+echo "=== Segment finished: $(date) ==="

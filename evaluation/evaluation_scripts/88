@@ -1,0 +1,68 @@
+#!/bin/bash
+#SBATCH --job-name=gw_matched_filter
+#SBATCH --partition=compute
+#SBATCH --array=1-200%50
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16G
+#SBATCH --time=03:00:00
+#SBATCH --output=logs/gwsearch_%A_%a.out
+#SBATCH --error=logs/gwsearch_%A_%a.err
+
+# ============================================================
+# Gravitational-wave matched-filter search (LIGO/Virgo-style):
+# cross-correlates strain data against a bank of compact
+# binary coalescence waveform templates over analysis time
+# segments. Each array task handles one (segment, template
+# sub-bank) chunk; a follow-up job coincidences triggers across
+# detectors.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs triggers
+
+module purge
+module load python/3.11
+module load fftw/3.3.10
+source activate pycbc_env
+
+CHUNK_TABLE="search_chunks.tsv"   # id  gps_start  gps_end  template_bank_file  detector
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$CHUNK_TABLE" ]; then
+    python3 build_search_chunks.py \
+        --gps-start 1400000000 \
+        --gps-end 1400864000 \
+        --segment-length 4096 \
+        --template-bank full_bank.xml \
+        --n-subbanks 20 \
+        --detectors H1 L1 \
+        --output "$CHUNK_TABLE"
+fi
+
+for i in {1..20}; do
+    [ -f "$CHUNK_TABLE" ] && break
+    sleep 3
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID GPS_START GPS_END BANK_FILE DETECTOR <<< "$(sed -n "${LINE}p" "$CHUNK_TABLE")"
+echo "=== Chunk $ID: detector=$DETECTOR gps=[$GPS_START,$GPS_END] bank=$BANK_FILE ==="
+
+# ---- Run matched-filter search over this segment/sub-bank ----
+pycbc_inspiral \
+    --gps-start-time "$GPS_START" \
+    --gps-end-time "$GPS_END" \
+    --instrument "$DETECTOR" \
+    --strain-data-file "strain/${DETECTOR}_strain.gwf" \
+    --template-bank "$BANK_FILE" \
+    --approximant SEOBNRv4 \
+    --low-frequency-cutoff 20 \
+    --snr-threshold 5.5 \
+    --chisq-threshold 5.0 \
+    --processing-scheme cpu:"${SLURM_CPUS_PER_TASK}" \
+    --output "triggers/chunk_${ID}_triggers.hdf"
+
+echo "Chunk $ID done at $(date). Triggers: triggers/chunk_${ID}_triggers.hdf"
+# Once all chunks complete, run coincidence + significance estimation with:
+#   pycbc_coinc_findtrigs --trigger-files triggers/chunk_*_triggers.hdf --output coincident_candidates.hdf

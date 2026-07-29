@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=event_processing
+#SBATCH --partition=cpu
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=128G
+#SBATCH --time=24:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+./process_events.sh     --input=/data/raw/events.root     --output=/data/processed/     --calibration=cal_db.json     --nthreads=32

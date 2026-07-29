@@ -1,0 +1,81 @@
+#!/bin/bash
+#SBATCH --job-name=dl_train
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=256G
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --signal=B:USR1@120        # warn 120s before time limit for checkpointing
+
+# ============================================================
+# Multi-GPU deep learning training with automatic checkpoint
+# resume. Requeues itself if it hits the time limit before
+# training converges.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs checkpoints
+
+CHECKPOINT_DIR="./checkpoints/${SLURM_JOB_NAME}"
+mkdir -p "$CHECKPOINT_DIR"
+
+module purge
+module load cuda/12.2
+module load cudnn/8.9
+module load anaconda3/2024.02
+source activate dl_env
+
+echo "=== GPU Info ==="
+nvidia-smi --query-gpu=index,name,memory.total,memory.used --format=csv
+
+# ---- Signal handler: checkpoint and requeue before time limit ----
+requeue_handler() {
+    echo "[SIGNAL] Caught time-limit warning at $(date). Requesting graceful stop."
+    touch "${CHECKPOINT_DIR}/STOP_REQUEST"
+    wait
+    if [ "$RESTART_COUNT" -lt "$MAX_RESTARTS" ]; then
+        echo "Requeuing job (attempt $((RESTART_COUNT+1))/${MAX_RESTARTS})"
+        scontrol requeue "$SLURM_JOB_ID"
+    fi
+    exit 0
+}
+trap requeue_handler USR1
+
+MAX_RESTARTS=10
+RESTART_COUNT=$(scontrol show job "$SLURM_JOB_ID" | grep -oP 'Restarts=\K[0-9]+' || echo 0)
+echo "Restart count: $RESTART_COUNT"
+
+# ---- Resolve latest checkpoint if resuming ----
+LATEST_CKPT=$(ls -t "${CHECKPOINT_DIR}"/*.ckpt 2>/dev/null | head -n1 || true)
+RESUME_ARG=""
+if [ -n "$LATEST_CKPT" ]; then
+    echo "Resuming from checkpoint: $LATEST_CKPT"
+    RESUME_ARG="--resume-from ${LATEST_CKPT}"
+fi
+
+# ---- Launch distributed training (single node, multi-GPU) ----
+torchrun \
+    --nproc_per_node=4 \
+    --nnodes=1 \
+    train.py \
+    --data-dir /projects/myuser/datasets/imagenet \
+    --batch-size 256 \
+    --epochs 200 \
+    --lr 0.1 \
+    --checkpoint-dir "$CHECKPOINT_DIR" \
+    --checkpoint-every-epoch \
+    $RESUME_ARG &
+
+wait $!
+TRAIN_STATUS=$?
+
+if [ $TRAIN_STATUS -eq 0 ]; then
+    echo "Training completed successfully at $(date)"
+else
+    echo "[WARN] Training process exited with status $TRAIN_STATUS"
+fi
+
+exit $TRAIN_STATUS

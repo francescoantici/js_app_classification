@@ -1,0 +1,68 @@
+#!/bin/bash
+#SBATCH --job-name=nest_cortical_sim
+#SBATCH --partition=compute
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=128G
+#SBATCH --time=12:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Large-scale spiking neural network simulation of a cortical
+# microcircuit (e.g. Potjans-Diesmann multi-layer column,
+# ~10^5-10^6 neurons, ~10^9 synapses) using NEST, with hybrid
+# MPI (across nodes) + OpenMP threading (within node) for
+# distributed connectivity and event-driven spike delivery.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs spikes
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load gsl/2.7.1
+module load nest-simulator/3.7-mpi
+module load python/3.11
+
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+CASE_DIR="/projects/myuser/neuroscience/cortical_microcircuit"
+cd "$CASE_DIR"
+
+TOTAL_VP=$((SLURM_NTASKS * OMP_NUM_THREADS))
+echo "=== NEST cortical simulation: $SLURM_NTASKS MPI processes x $OMP_NUM_THREADS threads = $TOTAL_VP virtual processes ==="
+
+# ---- Write simulation config (network scale, simulated biological time) ----
+cat > sim_config.py <<EOF
+network_scale = 1.0          # 1.0 = full-scale ~80k neurons per column
+simulated_time_ms = 10000.0  # 10 seconds of biological time
+n_mpi_procs = ${SLURM_NTASKS}
+n_threads_per_proc = ${OMP_NUM_THREADS}
+record_spikes = True
+spike_output_dir = "spikes"
+connectivity_seed = 12345
+EOF
+
+# ---- Run NEST simulation (network built + connected + simulated in one job) ----
+srun --mpi=pmix python3 run_cortical_microcircuit.py --config sim_config.py
+
+# ---- Verify spike output was produced for all populations ----
+N_SPIKE_FILES=$(ls spikes/*.gdf 2>/dev/null | wc -l)
+echo "Spike recorder files produced: $N_SPIKE_FILES"
+
+if [ "$N_SPIKE_FILES" -eq 0 ]; then
+    echo "[ERROR] No spike output found - simulation may have failed" >&2
+    exit 1
+fi
+
+# ---- Post-process: compute population firing rates and raster plot ----
+python3 analyze_network_activity.py \
+    --spikes-dir spikes \
+    --output analysis/population_firing_rates.json \
+    --raster-plot analysis/raster_plot.png
+
+echo "=== Job finished: $(date) ==="
+echo "Mean firing rates and raster plot written to analysis/"

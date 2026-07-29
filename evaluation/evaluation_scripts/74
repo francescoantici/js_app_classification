@@ -1,0 +1,86 @@
+#!/bin/bash
+#SBATCH --job-name=dns_turbulence
+#SBATCH --partition=compute
+#SBATCH --nodes=16
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Direct Numerical Simulation (DNS) of homogeneous isotropic
+# turbulence via pseudo-spectral method (2D pencil-decomposed
+# FFTs). Chains simulation segments, computes the energy
+# spectrum at each checkpoint, and stops once statistically
+# stationary turbulence is confirmed.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs checkpoints spectra
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load fftw/3.3.10-mpi
+module load p3dfft/2.7.9
+
+CASE_DIR="/projects/myuser/dns/hit_re_lambda_200"
+cd "$CASE_DIR"
+
+TARGET_EDDY_TURNOVERS=20
+TURNOVERS_PER_SEGMENT=2
+
+echo "=== DNS turbulence segment: $(date) ==="
+echo "Ranks: $SLURM_NTASKS (pencil decomposition)"
+
+# ---- Restart logic ----
+LATEST_CKPT=$(ls -v checkpoints/field_t*.bin 2>/dev/null | tail -n1 || true)
+if [ -n "$LATEST_CKPT" ]; then
+    echo "Resuming from checkpoint: $LATEST_CKPT"
+    RESTART_FLAG="--restart-file ${LATEST_CKPT}"
+else
+    echo "Starting fresh with random isotropic initial field"
+    RESTART_FLAG="--init-spectrum kolmogorov --seed 42"
+fi
+
+# ---- Run the pseudo-spectral solver for this segment ----
+srun --mpi=pmix ./dns_solver \
+    --resolution 1024 \
+    --reynolds-lambda 200 \
+    --pencil-decomp auto \
+    $RESTART_FLAG \
+    --run-eddy-turnovers "$TURNOVERS_PER_SEGMENT" \
+    --checkpoint-dir checkpoints \
+    --spectrum-output spectra \
+    --dealias 2/3
+
+# ---- Compute current eddy turnover count from checkpoint metadata ----
+LATEST_CKPT=$(ls -v checkpoints/field_t*.bin | tail -n1)
+CURRENT_TURNOVERS=$(python3 -c "
+import re
+m = re.search(r't([0-9.]+)\.bin', '${LATEST_CKPT}')
+print(round(float(m.group(1)), 2) if m else 0)
+")
+echo "Simulated eddy turnovers so far: $CURRENT_TURNOVERS / $TARGET_EDDY_TURNOVERS"
+
+# ---- Check energy spectrum for -5/3 inertial range scaling ----
+python3 check_stationarity.py \
+    --spectrum-dir spectra \
+    --output spectra/stationarity_report.json
+
+IS_STATIONARY=$(python3 -c "
+import json
+with open('spectra/stationarity_report.json') as f:
+    print(json.load(f).get('is_stationary', False))
+")
+
+if awk -v c="$CURRENT_TURNOVERS" -v t="$TARGET_EDDY_TURNOVERS" 'BEGIN{exit !(c < t)}' && [ "$IS_STATIONARY" != "True" ]; then
+    echo "Continuing simulation - resubmitting next segment"
+    sbatch "$0"
+else
+    echo "Target reached or statistically stationary turbulence confirmed."
+    echo "Computing final statistics (structure functions, dissipation rate)"
+    python3 compute_turbulence_statistics.py --checkpoint "$LATEST_CKPT" --output final_stats.json
+fi
+
+echo "=== Segment finished: $(date) ==="

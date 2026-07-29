@@ -1,0 +1,75 @@
+#!/bin/bash
+#SBATCH --job-name=accel_beam_dynamics
+#SBATCH --partition=compute
+#SBATCH --array=1-30%15
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=06:00:00
+#SBATCH --output=logs/beam_%A_%a.out
+#SBATCH --error=logs/beam_%A_%a.err
+
+# ============================================================
+# Accelerator physics: self-consistent particle-in-cell beam
+# dynamics tracking (space-charge included) through a linac or
+# storage-ring lattice, using OPAL. Array job sweeps over
+# lattice tuning configurations (quadrupole strengths / RF
+# phases) to find configurations minimizing emittance growth.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results
+
+module purge
+module load openmpi/4.1.5
+module load opal/2023.1
+module load gsl/2.7.1
+
+LATTICE_TABLE="lattice_configs.tsv"    # id  quad_k1  quad_k2  rf_phase_deg
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$LATTICE_TABLE" ]; then
+    python3 - <<'EOF'
+import itertools
+k1s = [1.2, 1.4, 1.6, 1.8, 2.0]
+k2s = [-1.8, -1.6, -1.4]
+phases = [0, 5]
+rows = []
+for i, (k1, k2, ph) in enumerate(itertools.product(k1s, k2s, phases), start=1):
+    rows.append(f"{i}\t{k1}\t{k2}\t{ph}")
+with open("lattice_configs.tsv", "w") as f:
+    f.write("id\tquad_k1\tquad_k2\trf_phase_deg\n")
+    f.write("\n".join(rows) + "\n")
+EOF
+fi
+
+for i in {1..15}; do
+    [ -f "$LATTICE_TABLE" ] && break
+    sleep 2
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID K1 K2 PHASE <<< "$(sed -n "${LINE}p" "$LATTICE_TABLE")"
+echo "=== Config $ID: quad_k1=$K1 quad_k2=$K2 rf_phase=${PHASE}deg ==="
+
+CONFIG_DIR="results/config_${ID}"
+mkdir -p "$CONFIG_DIR"
+cd "$CONFIG_DIR"
+
+# ---- Generate OPAL input deck for this lattice configuration ----
+sed -e "s/@QUAD_K1@/${K1}/" \
+    -e "s/@QUAD_K2@/${K2}/" \
+    -e "s/@RF_PHASE@/${PHASE}/" \
+    ../../linac_template.in > linac_config.in
+
+# ---- Run OPAL particle tracking (1e6 macroparticles, space charge on) ----
+mpirun -np "$SLURM_NTASKS" opal linac_config.in --info 2
+
+# ---- Extract final emittance and beam envelope statistics ----
+python3 ../../extract_beam_stats.py \
+    --stat-file linac_config.stat \
+    --output "emittance_summary_${ID}.json"
+
+echo "Config $ID done at $(date)"
+cd ../..
+# After all configs complete, find the optimal tune with:
+#   python3 rank_lattice_configs.py --results-dir results --output optimal_tune.json

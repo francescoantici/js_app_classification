@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -N process_nights
+#PBS -l select=1:ncpus=16:mpiprocs=1
+#PBS -l walltime=08:00:00
+#PBS -J 1-365
+
+cd $PBS_O_WORKDIR
+source activate astro_env
+
+python process_night.py     --night-index=$PBS_ARRAY_INDEX     --raw-dir=/telescope/raw/2024     --calibrated-dir=/data/calibrated     --process-bias     --process-flats

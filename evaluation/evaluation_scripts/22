@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=metagenomics
+#SBATCH --partition=workflow
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=256G
+#SBATCH --time=48:00:00
+
+module load nextflow/23.10.0
+
+nextflow run metagenomics_pipeline.nf     -profile apptainer     --reads 'fastqs/*.{1,2}.fastq.gz'     --db /databases/metaphlan4     --outdir results/     -resume

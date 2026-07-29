@@ -1,0 +1,78 @@
+#!/bin/bash
+#SBATCH --job-name=gadget_cosmo
+#SBATCH --partition=compute
+#SBATCH --nodes=16
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --signal=B:USR1@300
+
+# ============================================================
+# GADGET-4 cosmological N-body/SPH simulation (large-scale
+# structure formation). Uses a signal handler to write a
+# checkpoint restart file before the wall-time limit and
+# self-resubmits until the target redshift z=0 is reached.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load fftw/3.3.10-mpi
+module load gsl/2.7.1
+module load hdf5/1.14.0-mpi
+
+CASE_DIR="/projects/myuser/gadget/box_1Gpc_2048"
+cd "$CASE_DIR"
+
+echo "=== GADGET-4 segment starting: $(date) ==="
+
+# ---- Handle time-limit warning: request checkpoint via stop file ----
+checkpoint_handler() {
+    echo "[SIGNAL] Wall-time warning received, requesting graceful stop"
+    touch stop
+}
+trap checkpoint_handler USR1
+
+# ---- Determine restart mode ----
+LATEST_RESTART=$(ls -d restartfiles/*.restart 2>/dev/null | sort -V | tail -n1 || true)
+
+if [ -n "$LATEST_RESTART" ]; then
+    echo "Restarting from checkpoint set: $LATEST_RESTART"
+    srun --mpi=pmix ./Gadget4 param.txt 1 &   # "1" = restart flag
+else
+    echo "Starting fresh simulation"
+    srun --mpi=pmix ./Gadget4 param.txt &
+fi
+wait $!
+
+# ---- Check current expansion factor / redshift reached ----
+LAST_SNAP=$(ls snapdir_* 2>/dev/null | sort -V | tail -n1 || echo "none")
+CURRENT_Z=$(python3 -c "
+import re
+try:
+    with open('OutputListZ.txt') as f:
+        pass
+except Exception:
+    pass
+" 2>/dev/null || echo "unknown")
+
+echo "Last snapshot directory: $LAST_SNAP"
+
+# ---- Check if simulation finished naturally (reached final scale factor) ----
+if grep -q "Simulation ended" gadget_output.log 2>/dev/null; then
+    echo "Simulation reached target redshift (z=0). Running halo finder."
+    module load python/3.11
+    python3 "${CASE_DIR}/scripts/run_subfind_summary.py" \
+        --snapshot "$LAST_SNAP" \
+        --output "halo_catalog_final.hdf5"
+else
+    echo "Target not reached - resubmitting continuation segment"
+    rm -f stop
+    sbatch "$0"
+fi
+
+echo "=== GADGET-4 segment finished: $(date) ==="

@@ -1,0 +1,84 @@
+#!/bin/bash
+#SBATCH --job-name=pism_icesheet
+#SBATCH --partition=compute
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# PISM (Parallel Ice Sheet Model) simulation of glacier/ice-
+# sheet dynamics under a prescribed climate forcing scenario
+# (e.g. Antarctic or Greenland mass-balance projection).
+# Chains multi-century segments via PISM's native -o/-i
+# restart file mechanism.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs states
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load netcdf/4.9.2-mpi
+module load pism/2.1
+
+CASE_DIR="/projects/myuser/pism/greenland_ssp585"
+cd "$CASE_DIR"
+
+TARGET_YEARS=500
+YEARS_PER_SEGMENT=50
+
+echo "=== PISM ice-sheet segment: $(date) ==="
+
+# ---- Determine current simulation year from latest state file ----
+LATEST_STATE=$(ls -v states/state_y*.nc 2>/dev/null | tail -n1 || true)
+if [ -n "$LATEST_STATE" ]; then
+    CURRENT_YEAR=$(echo "$LATEST_STATE" | grep -oP 'state_y\K[0-9]+')
+    echo "Resuming from year $CURRENT_YEAR: $LATEST_STATE"
+    INPUT_FLAG="-i ${LATEST_STATE}"
+else
+    CURRENT_YEAR=0
+    echo "Starting fresh from bootstrapped present-day state"
+    INPUT_FLAG="-i greenland_bootstrap.nc -bootstrap"
+fi
+
+END_YEAR=$((CURRENT_YEAR + YEARS_PER_SEGMENT))
+OUTPUT_STATE="states/state_y${END_YEAR}.nc"
+
+# ---- Run PISM ----
+srun --mpi=pmix pismr \
+    $INPUT_FLAG \
+    -Mx 768 -My 1360 -Mz 101 -Lz 4000 \
+    -surface given \
+    -surface_given_file climate_forcing_ssp585.nc \
+    -atmosphere given \
+    -ocean th \
+    -sia_e 3.0 \
+    -pik \
+    -y "$YEARS_PER_SEGMENT" \
+    -o "$OUTPUT_STATE" \
+    -extra_file states/timeseries_${CURRENT_YEAR}_${END_YEAR}.nc \
+    -extra_times "${YEARS_PER_SEGMENT}"/1/"${YEARS_PER_SEGMENT}" \
+    -extra_vars thk,velsurf_mag,mask,topg
+
+echo "Completed through simulation year $END_YEAR"
+
+# ---- Compute sea-level-equivalent volume change this segment ----
+module load python/3.11
+python3 compute_sle_contribution.py \
+    --state-before "${LATEST_STATE:-greenland_bootstrap.nc}" \
+    --state-after "$OUTPUT_STATE" \
+    --output "states/sle_change_${CURRENT_YEAR}_${END_YEAR}.json"
+
+# ---- Chain next segment or finish ----
+if [ "$END_YEAR" -lt "$TARGET_YEARS" ]; then
+    echo "Resubmitting for year $END_YEAR onward"
+    sbatch "$0"
+else
+    echo "Target simulation length reached ($TARGET_YEARS years)."
+    python3 plot_cumulative_sle.py --states-dir states --output final_sle_projection.png
+fi
+
+echo "=== Segment finished: $(date) ==="

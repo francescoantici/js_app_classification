@@ -1,0 +1,81 @@
+#!/bin/bash
+# ============================================================
+# Driver for a GW/Bethe-Salpeter-Equation (BSE) many-body
+# perturbation theory workflow to compute quasiparticle band
+# structures and optical absorption spectra: mean-field DFT ->
+# dielectric matrix (epsilon) -> self-energy (sigma, GW) ->
+# BSE optical spectrum. Each stage depends on the last.
+# Run from login node: bash 38_berkeleygw_gw_bse_workflow.sh
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+echo "=== Stage 1: Mean-field DFT (dense k-grid, many empty bands) ==="
+DFT_JOBID=$(sbatch --parsable \
+    --job-name=gw_meanfield \
+    --partition=compute \
+    --nodes=2 --ntasks-per-node=32 \
+    --time=06:00:00 \
+    --output=logs/%x_%j.out --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load quantum-espresso/7.3
+        srun --mpi=pmix pw.x -npool 4 -in scf.in > scf.out
+        srun --mpi=pmix pw.x -npool 4 -in wfn.in > wfn.out    # many unoccupied bands
+        srun --mpi=pmix pw.x -npool 4 -in wfnq.in > wfnq.out  # shifted grid for epsilon
+    ')
+echo "Mean-field job submitted: $DFT_JOBID"
+
+echo "=== Stage 2: Dielectric matrix (epsilon) - depends on mean-field ==="
+EPS_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${DFT_JOBID} \
+    --job-name=gw_epsilon \
+    --partition=compute \
+    --nodes=4 --ntasks-per-node=32 \
+    --time=08:00:00 \
+    --output=logs/%x_%j.out --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load berkeleygw/4.0
+        srun --mpi=pmix epsilon.cplx.x epsilon.inp > epsilon.out
+        [ -f eps0mat.h5 ] || { echo "epsilon matrix missing"; exit 1; }
+    ')
+echo "Epsilon job submitted: $EPS_JOBID (depends on afterok:${DFT_JOBID})"
+
+echo "=== Stage 3: Self-energy (GW quasiparticle corrections) - depends on epsilon ==="
+SIG_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${EPS_JOBID} \
+    --job-name=gw_sigma \
+    --partition=compute \
+    --nodes=4 --ntasks-per-node=32 \
+    --time=12:00:00 \
+    --output=logs/%x_%j.out --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load berkeleygw/4.0
+        srun --mpi=pmix sigma.cplx.x sigma.inp > sigma.out
+        grep -q "band_index" eqp1.dat || { echo "QP corrections missing"; exit 1; }
+    ')
+echo "Sigma (GW) job submitted: $SIG_JOBID (depends on afterok:${EPS_JOBID})"
+
+echo "=== Stage 4: Bethe-Salpeter equation (optical spectrum) - depends on GW ==="
+BSE_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${SIG_JOBID} \
+    --job-name=gw_bse \
+    --partition=compute \
+    --nodes=6 --ntasks-per-node=32 \
+    --time=16:00:00 \
+    --output=logs/%x_%j.out --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load berkeleygw/4.0
+        srun --mpi=pmix kernel.cplx.x kernel.inp > kernel.out
+        srun --mpi=pmix absorption.cplx.x absorption.inp > absorption.out
+        module load python/3.11
+        python3 plot_absorption_spectrum.py \
+            --input absorption_eh.dat --output optical_spectrum.png
+    ')
+echo "BSE job submitted: $BSE_JOBID (depends on afterok:${SIG_JOBID})"
+
+echo "Chain: $DFT_JOBID -> $EPS_JOBID -> $SIG_JOBID -> $BSE_JOBID"

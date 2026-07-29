@@ -1,0 +1,101 @@
+#!/bin/bash
+#SBATCH --job-name=pic_plasma
+#SBATCH --partition=gpu
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Particle-in-cell (PIC) simulation of laser-wakefield
+# acceleration using a GPU-accelerated PIC code (EPOCH/OSIRIS-
+# style). Domain-decomposed across MPI ranks, one GPU per
+# rank, with periodic particle/field diagnostics dumps and
+# checkpoint-based restart.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs diagnostics checkpoints
+
+module purge
+module load cuda/12.2
+module load openmpi/4.1.5
+module load epoch/4.19-gpu
+
+CASE_DIR="/projects/myuser/pic/lwfa_bubble_regime"
+cd "$CASE_DIR"
+
+TOTAL_GPUS=$((SLURM_NNODES * 4))
+echo "=== PIC laser-plasma simulation: $TOTAL_GPUS GPUs ==="
+
+# ---- Restart detection ----
+if [ -f checkpoints/restart.chk ]; then
+    echo "Restarting from checkpoint"
+    RESTART_FLAG="-r"
+else
+    echo "Fresh start"
+    RESTART_FLAG=""
+fi
+
+# ---- Configure simulation deck parameters (grid, laser, plasma density) ----
+cat > input.deck <<EOF
+begin:control
+  nx = 4000
+  ny = 2000
+  npart = 4e8
+  t_end = 2.0e-12
+  stdout_frequency = 100
+end:control
+
+begin:boundaries
+  bc_x_min = simple_laser
+  bc_x_max = simple_outflow
+  bc_y_min = periodic
+  bc_y_max = periodic
+end:boundaries
+
+begin:laser
+  boundary = x_min
+  intensity_w_cm2 = 5.0e18
+  lambda = 0.8e-6
+  t_profile = gauss(time, 30e-15, 30e-15)
+end:laser
+
+begin:species
+  name = electron
+  charge = -1
+  mass = 1
+  density = if (x gt 100e-6, 1e19 * 1e6, 0)
+end:species
+
+begin:output
+  dt_snapshot = 50e-15
+  particles = always
+  ex = always
+  ey = always
+  charge_density = always
+end:output
+EOF
+
+# ---- Launch GPU-resident PIC solver, one GPU per MPI rank ----
+srun --mpi=pmix --gpus-per-task=1 \
+    ./epoch2d_gpu $RESTART_FLAG < input.deck
+
+# ---- Verify completion ----
+if [ -f "diagnostics/final_state.sdf" ]; then
+    echo "PIC simulation completed successfully"
+else
+    echo "[WARN] Final diagnostic not found - simulation may need continuation"
+    exit 1
+fi
+
+# ---- Post-process: extract electron energy spectrum ----
+module load python/3.11
+python3 analyze_electron_spectrum.py \
+    --diagnostics-dir diagnostics \
+    --output diagnostics/electron_energy_spectrum.png
+
+echo "=== Job finished: $(date) ==="

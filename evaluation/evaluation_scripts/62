@@ -1,0 +1,80 @@
+#!/bin/bash
+#SBATCH --job-name=nwchem_ccsdt
+#SBATCH --partition=bigmem
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
+#SBATCH --mem=1000G
+#SBATCH --time=72:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# NWChem CCSD(T) coupled-cluster single-point energy on a
+# medium-sized molecule. Coupled-cluster scales steeply in
+# memory/disk, so this targets a big-memory node and uses
+# local NVMe scratch for the large integral files.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load nwchem/7.2.2
+
+LOCAL_SCRATCH="/local_nvme/${USER}/${SLURM_JOB_ID}"
+mkdir -p "$LOCAL_SCRATCH"
+
+CASE_DIR="/projects/myuser/qchem/ccsdt_case"
+cd "$CASE_DIR"
+
+echo "=== NWChem CCSD(T) job: $(date) ==="
+echo "Scratch: $LOCAL_SCRATCH"
+
+# ---- Generate NWChem input with scratch directory injected ----
+cat > ccsdt.nw <<EOF
+echo
+start ccsdt_calc
+memory total 900 gb
+scratch_dir ${LOCAL_SCRATCH}
+permanent_dir ${CASE_DIR}
+
+geometry units angstrom
+  load molecule.xyz
+end
+
+basis
+  * library aug-cc-pVTZ
+end
+
+scf
+  thresh 1e-8
+  maxiter 200
+end
+
+tce
+  ccsd(t)
+  freeze atomic
+  thresh 1e-8
+  maxiter 100
+end
+
+task tce energy
+EOF
+
+# ---- Run NWChem ----
+srun --mpi=pmi2 nwchem ccsdt.nw > ccsdt.out 2>&1
+
+# ---- Check for successful termination ----
+if grep -q "CCSD(T) total energy" ccsdt.out; then
+    echo "CCSD(T) energy converged successfully"
+    grep "CCSD(T) total energy" ccsdt.out
+else
+    echo "[ERROR] CCSD(T) calculation did not complete successfully" >&2
+    tail -n 50 ccsdt.out
+    rm -rf "$LOCAL_SCRATCH"
+    exit 1
+fi
+
+# ---- Clean up local scratch (large integral files) ----
+rm -rf "$LOCAL_SCRATCH"
+echo "=== Job finished: $(date) ==="

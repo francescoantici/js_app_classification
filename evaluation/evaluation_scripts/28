@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=openmm_folding
+#SBATCH --partition=gpu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --gres=gpu:a100:4
+#SBATCH --time=168:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+source activate openmm_env
+
+python openmm_pipeline.py     --pdb initial_structure.pdb     --forcefield amber14     --steps-minimize 10000     --steps-prod 50000000     --platform CUDA

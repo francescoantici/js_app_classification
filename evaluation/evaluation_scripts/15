@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=gpt3_deepspeed
+#SBATCH --partition=gpu
+#SBATCH --nodes=16
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=6
+#SBATCH --gres=gpu:a100:8
+#SBATCH --time=168:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+apptainer exec --nv deepspeed.sif     deepspeed train_gpt3_deepspeed.py     --deepspeed_config ds_config.json     --zero-stage=3     --gradient-accumulation-steps=8     --batch-size-per-gpu=4

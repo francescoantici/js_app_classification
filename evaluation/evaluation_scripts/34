@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job-name=lattice_qcd
+#SBATCH --partition=cpu
+#SBATCH --nodes=16
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=2
+#SBATCH --time=120:00:00
+
+module load openmpi/4.1.1
+
+mpirun -np 512 singularity exec qcd.sif python lattice_qcd.py     --lattice-size=64,64,64,128     --beta=6.0     --configurations=1000

@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=bioinfo_setup
+#SBATCH --partition=serial
+#SBATCH --cpus-per-task=2
+#SBATCH --time=00:15:00
+
+module purge
+module load bioinformatics/bwa/0.7.17
+module load bioinformatics/samtools/1.16
+module load bioinformatics/gatk/4.4.0
+module load bioinformatics/bcftools/1.17
+
+export REFSEQ=/databases/hg38.fa
+export GATK_JAVA_OPTS="-Xmx64g"

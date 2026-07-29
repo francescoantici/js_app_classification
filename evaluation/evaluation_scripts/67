@@ -1,0 +1,73 @@
+#!/bin/bash
+#SBATCH --job-name=lattice_qcd
+#SBATCH --partition=gpu
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Lattice QCD gauge configuration generation (HMC trajectory
+# stream) using QUDA-accelerated Chroma on a GPU cluster. Runs
+# a fixed number of trajectories per job segment and chains
+# additional segments until the target ensemble size is met.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs configs
+
+module purge
+module load cuda/12.2
+module load openmpi/4.1.5
+module load quda/1.1.0
+module load chroma/qphix-quda
+
+CASE_DIR="/projects/myuser/lqcd/ensemble_48x96_b6p1"
+cd "$CASE_DIR"
+
+TOTAL_GPUS=$((SLURM_NNODES * 4))
+TARGET_TRAJECTORIES=1000
+TRAJ_PER_SEGMENT=20
+
+echo "=== Lattice QCD HMC stream: $(date) ==="
+echo "GPUs: $TOTAL_GPUS"
+
+# ---- Determine current trajectory count from existing configs ----
+CURRENT_TRAJ=$(ls configs/cfg_*.lime 2>/dev/null | wc -l)
+echo "Current ensemble size: $CURRENT_TRAJ / $TARGET_TRAJECTORIES"
+
+START_TRAJ=$CURRENT_TRAJ
+END_TRAJ=$((CURRENT_TRAJ + TRAJ_PER_SEGMENT))
+
+# ---- QUDA/GPU layout: 4D process grid, one GPU per rank ----
+export QUDA_RESOURCE_PATH="./quda_tunecache"
+mkdir -p "$QUDA_RESOURCE_PATH"
+export QUDA_ENABLE_GDR=1
+
+# ---- Build XML input for this HMC segment ----
+sed -e "s/@START_TRAJ@/${START_TRAJ}/g" \
+    -e "s/@END_TRAJ@/${END_TRAJ}/g" \
+    hmc_template.xml.in > hmc_segment.xml
+
+# ---- Run HMC trajectory generation ----
+srun --mpi=pmix -n "$TOTAL_GPUS" \
+    chroma -geom 2 2 2 4 \
+    -i hmc_segment.xml -o hmc_segment_${START_TRAJ}_${END_TRAJ}.xml.out \
+    -qmp-geom 2 2 2 4
+
+# ---- Verify all trajectories in this segment were accepted/written ----
+NEW_COUNT=$(ls configs/cfg_*.lime 2>/dev/null | wc -l)
+echo "Ensemble size after this segment: $NEW_COUNT"
+
+if [ "$NEW_COUNT" -lt "$TARGET_TRAJECTORIES" ]; then
+    echo "Target ensemble size not reached - resubmitting next segment"
+    sbatch "$0"
+else
+    echo "Target ensemble size reached ($TARGET_TRAJECTORIES trajectories)."
+    echo "Submit measurement jobs (e.g. quark propagators) separately."
+fi
+
+echo "=== Segment finished: $(date) ==="

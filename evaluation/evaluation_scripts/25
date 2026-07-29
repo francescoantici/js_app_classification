@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job-name=financial_analysis
+#SBATCH --partition=serial
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64G
+#SBATCH --time=06:00:00
+
+module load python/3.10.0
+source activate pandas_env
+
+python analyze_market_data.py     --symbols AAPL,GOOGL,MSFT     --start-date=2020-01-01     --window-size=30     --output=metrics.csv

@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=cp2k_reaction
+#SBATCH --partition=cpu
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=2
+#SBATCH --time=96:00:00
+
+module load cp2k/2023.2
+
+export OMP_NUM_THREADS=2
+export CP2K_DATA_DIR=/opt/cp2k/data
+
+mpirun -np 256 cp2k.psmp     -i reaction_metadynamics.inp     -o reaction.out     -npools 4

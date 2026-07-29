@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --job-name=medical_segmentation
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:v100:2
+#SBATCH --mem=256G
+#SBATCH --time=48:00:00
+
+source activate tensorflow_env
+
+python segmentation_inference.py     --model-path=models/unet_3d.h5     --input-dir=/data/mri_scans/     --output-dir=/results/segmentations/     --batch-size=8     --gpus=2

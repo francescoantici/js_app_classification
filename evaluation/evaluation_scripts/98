@@ -1,0 +1,98 @@
+#!/bin/bash
+# ============================================================
+# Driver for an active-learning loop that trains a machine-
+# learned interatomic potential (DeePMD-kit style): train
+# potential ensemble -> run exploratory MD with it -> flag
+# high-uncertainty configurations -> label them with DFT ->
+# add to training set -> retrain. Each stage is a dependent
+# SLURM job; the loop repeats for a fixed number of rounds.
+# Run from login node: bash 49_ml_potential_active_learning.sh
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs training_data models exploration labeled
+
+N_ROUNDS=8
+N_MODELS=4          # ensemble size for uncertainty (query-by-committee)
+
+PREV_JOBID=""
+for ROUND in $(seq 1 "$N_ROUNDS"); do
+    echo "=== Active learning round $ROUND ==="
+
+    DEP_FLAG=""
+    [ -n "$PREV_JOBID" ] && DEP_FLAG="--dependency=afterok:${PREV_JOBID}"
+
+    # ---- 1. Train an ensemble of potentials (query-by-committee) on GPU ----
+    TRAIN_JOBID=$(sbatch --parsable $DEP_FLAG \
+        --job-name="mlp_train_r${ROUND}" \
+        --partition=gpu \
+        --array=1-${N_MODELS} \
+        --gres=gpu:1 \
+        --cpus-per-task=8 \
+        --mem=32G \
+        --time=06:00:00 \
+        --output=logs/%x_%A_%a.out --error=logs/%x_%A_%a.err \
+        --wrap="
+            set -euo pipefail
+            module load cuda/12.2
+            source activate deepmd_env
+            MODEL_ID=\$SLURM_ARRAY_TASK_ID
+            mkdir -p models/round_${ROUND}/model_\${MODEL_ID}
+            cd models/round_${ROUND}/model_\${MODEL_ID}
+            cp ../../../training_data/current_dataset.json .
+            dp train --init-model-seed \${MODEL_ID} ../../../input_template.json
+            dp freeze -o model.pb
+        ")
+    echo "  Training (round $ROUND) submitted: $TRAIN_JOBID"
+
+    # ---- 2. Exploratory MD using the ensemble + uncertainty flagging ----
+    EXPLORE_JOBID=$(sbatch --parsable \
+        --dependency=afterok:${TRAIN_JOBID} \
+        --job-name="mlp_explore_r${ROUND}" \
+        --partition=gpu \
+        --gres=gpu:1 \
+        --cpus-per-task=8 \
+        --mem=32G \
+        --time=04:00:00 \
+        --output=logs/%x_%j.out --error=logs/%x_%j.err \
+        --wrap="
+            set -euo pipefail
+            module load cuda/12.2 lammps/2Aug2024-kokkos-gpu
+            source activate deepmd_env
+            mkdir -p exploration/round_${ROUND}
+            cd exploration/round_${ROUND}
+            for i in 1 2 3 4; do ln -sf ../../models/round_${ROUND}/model_\${i}/model.pb model_\${i}.pb; done
+            lmp -k on g 1 -sf kk -in ../../explore_md_template.in -log explore.log
+            python3 ../../flag_high_uncertainty_frames.py \
+                --dump-file dump.explore --models model_1.pb model_2.pb model_3.pb model_4.pb \
+                --uncertainty-threshold 0.15 --output flagged_frames.xyz
+        ")
+    echo "  Exploration (round $ROUND) submitted: $EXPLORE_JOBID"
+
+    # ---- 3. DFT labeling of flagged high-uncertainty configurations ----
+    LABEL_JOBID=$(sbatch --parsable \
+        --dependency=afterok:${EXPLORE_JOBID} \
+        --job-name="mlp_label_r${ROUND}" \
+        --partition=compute \
+        --nodes=2 --ntasks-per-node=32 \
+        --time=08:00:00 \
+        --output=logs/%x_%j.out --error=logs/%x_%j.err \
+        --wrap="
+            set -euo pipefail
+            module load vasp/6.4.2-std
+            mkdir -p labeled/round_${ROUND}
+            python3 run_dft_labeling.py \
+                --frames exploration/round_${ROUND}/flagged_frames.xyz \
+                --output-dir labeled/round_${ROUND} \
+                --mpi-command 'srun --mpi=pmi2 -n 64 vasp_std'
+            python3 merge_into_training_set.py \
+                --new-labels labeled/round_${ROUND} \
+                --dataset training_data/current_dataset.json
+        ")
+    echo "  DFT labeling (round $ROUND) submitted: $LABEL_JOBID"
+
+    PREV_JOBID=$LABEL_JOBID
+done
+
+echo "=== Active learning loop submitted (${N_ROUNDS} rounds) ==="
+echo "Final job in chain: $PREV_JOBID"

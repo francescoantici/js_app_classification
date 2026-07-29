@@ -1,0 +1,74 @@
+#!/bin/bash
+#SBATCH --job-name=dakota_uq
+#SBATCH --partition=compute
+#SBATCH --array=1-256%64
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/uq_%A_%a.out
+#SBATCH --error=logs/uq_%A_%a.err
+
+# ============================================================
+# Uncertainty quantification / global sensitivity analysis:
+# runs a physics simulation (here, a structural thermal
+# analysis) at each of N quasi-random (Sobol') sample points
+# in parameter space, as an array job. A follow-up driver
+# fits a Gaussian-process surrogate and computes Sobol indices.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs samples results
+
+module purge
+module load python/3.11
+source activate dakota_uq_env
+
+SAMPLE_TABLE="sobol_samples.tsv"    # id  thermal_conductivity  youngs_modulus  thickness_mm  bc_temp_c
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+# ---- Generate Sobol' quasi-random sample design once ----
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$SAMPLE_TABLE" ]; then
+    python3 - <<'EOF'
+from scipy.stats import qmc
+import numpy as np
+
+sampler = qmc.Sobol(d=4, scramble=True, seed=42)
+samples = sampler.random_base2(m=8)  # 256 samples
+
+bounds = {
+    "k": (0.5, 5.0),      # W/m-K
+    "E": (150e9, 250e9),  # Pa
+    "t": (1.0, 10.0),     # mm
+    "T": (20, 150),       # deg C
+}
+scaled = qmc.scale(samples, [b[0] for b in bounds.values()], [b[1] for b in bounds.values()])
+
+with open("sobol_samples.tsv", "w") as f:
+    f.write("id\tthermal_conductivity\tyoungs_modulus\tthickness_mm\tbc_temp_c\n")
+    for i, row in enumerate(scaled, start=1):
+        f.write(f"{i}\t{row[0]:.4f}\t{row[1]:.4e}\t{row[2]:.4f}\t{row[3]:.2f}\n")
+EOF
+fi
+
+for i in {1..15}; do
+    [ -f "$SAMPLE_TABLE" ] && break
+    sleep 2
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID K E T_MM BC_TEMP <<< "$(sed -n "${LINE}p" "$SAMPLE_TABLE")"
+echo "=== Sample $ID: k=$K E=$E t=${T_MM}mm T_bc=${BC_TEMP}C ==="
+
+# ---- Run the (cheap) physics model for this parameter combination ----
+python3 thermal_structural_model.py \
+    --conductivity "$K" \
+    --youngs-modulus "$E" \
+    --thickness-mm "$T_MM" \
+    --bc-temp-c "$BC_TEMP" \
+    --output "results/sample_${ID}.json"
+
+echo "Sample $ID done at $(date)"
+# After all 256 samples complete, fit surrogate & compute Sobol indices with:
+#   python3 fit_surrogate_and_sobol.py --samples-dir results --design sobol_samples.tsv \
+#       --surrogate gaussian_process --output uq_sensitivity_report.json

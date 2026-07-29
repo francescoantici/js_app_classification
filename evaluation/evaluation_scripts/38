@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=gnn_training
+#SBATCH --partition=gpu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:a100:4
+#SBATCH --time=72:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+enroot start --mount $PWD:/workspace pytorch-geometric.sqsh     bash -c "cd /workspace && python train_gnn.py     --dataset ogbg-molhiv     --model gin     --epochs=100     --device=cuda"

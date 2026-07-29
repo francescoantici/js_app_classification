@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --job-name=dreambooth
+#SBATCH --partition=gpu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:a100:8
+#SBATCH --mem=512G
+#SBATCH --time=72:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+apptainer exec --nv stable-diffusion.sif     python train_dreambooth.py     --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5     --instance_data_dir=/data/art_style     --output_dir=/models/dreambooth     --resolution=512

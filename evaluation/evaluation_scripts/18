@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH --job-name=cylc_wrf
+#SBATCH --partition=workflow
+#SBATCH --cpus-per-task=4
+#SBATCH --time=96:00:00
+
+module load cylc/8.2.0
+
+cylc install wrf_ensemble
+cylc play wrf_ensemble --no-detach --debug     -m 'initial_cycle_point=20240101T00Z'

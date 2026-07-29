@@ -1,0 +1,98 @@
+#!/bin/bash
+#SBATCH --job-name=relion_cryoem
+#SBATCH --partition=gpu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=256G
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Cryo-EM single-particle analysis pipeline using RELION:
+# motion correction -> CTF estimation -> particle picking ->
+# 2D/3D classification -> 3D auto-refinement -> post-processing
+# (B-factor sharpening, FSC-based resolution estimate).
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load cuda/12.2
+module load openmpi/4.1.5
+module load relion/5.0-gpu
+module load ctffind/4.1.14
+module load motioncor2/1.6.4
+
+CASE_DIR="/projects/myuser/cryoem/ribosome_complex"
+cd "$CASE_DIR"
+
+TOTAL_GPUS=$((SLURM_NNODES * 4))
+echo "=== RELION cryo-EM pipeline: $TOTAL_GPUS GPUs ==="
+
+# ---- 1. Motion correction (already assumed run upstream; verify) ----
+if [ ! -d MotionCorr/job001 ]; then
+    echo "[ERROR] Expected pre-processed MotionCorr output not found" >&2
+    exit 1
+fi
+
+# ---- 2. 3D classification (multi-GPU, MPI) to separate conformational states ----
+echo "[1/3] 3D classification"
+mpirun -np "$TOTAL_GPUS" relion_refine_mpi \
+    --o Class3D/job010/run \
+    --auto_refine --split_random_halves \
+    --i particles_selected.star \
+    --ref reference_map.mrc \
+    --firstiter_cc \
+    --ini_high 40 \
+    --dont_combine_weights_via_disc \
+    --pool 30 \
+    --pad 2 \
+    --ctf \
+    --particle_diameter 300 \
+    --flatten_solvent --zero_mask \
+    --oversampling 1 \
+    --healpix_order 2 \
+    --auto_local_healpix_order 4 \
+    --offset_range 5 --offset_step 2 \
+    --sym C1 \
+    --low_resol_join_halves 40 \
+    --norm --scale \
+    --j "$SLURM_CPUS_PER_TASK" \
+    --gpu ""
+
+# ---- 3. 3D auto-refinement to gold-standard resolution ----
+echo "[2/3] 3D auto-refinement"
+mpirun -np "$TOTAL_GPUS" relion_refine_mpi \
+    --o Refine3D/job020/run \
+    --auto_refine --split_random_halves \
+    --i Class3D/job010/best_class_particles.star \
+    --ref Class3D/job010/run_class001.mrc \
+    --firstiter_cc --ini_high 20 \
+    --ctf --particle_diameter 300 \
+    --flatten_solvent --zero_mask \
+    --oversampling 1 \
+    --healpix_order 2 --auto_local_healpix_order 4 \
+    --offset_range 5 --offset_step 2 \
+    --sym C1 --low_resol_join_halves 40 \
+    --norm --scale \
+    --j "$SLURM_CPUS_PER_TASK" \
+    --gpu ""
+
+# ---- 4. Post-processing: sharpening + FSC resolution estimate ----
+echo "[3/3] Post-processing"
+relion_postprocess \
+    --i Refine3D/job020/run_half1_class001_unfil.mrc \
+    --i2 Refine3D/job020/run_half2_class001_unfil.mrc \
+    --o PostProcess/job030/postprocess \
+    --mask solvent_mask.mrc \
+    --auto_bfac \
+    --autob_lowres 10
+
+RESOLUTION=$(grep "FINAL RESOLUTION" PostProcess/job030/postprocess.log || echo "not found")
+echo "Final resolution: $RESOLUTION"
+
+echo "=== Cryo-EM pipeline finished: $(date) ==="

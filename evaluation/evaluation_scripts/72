@@ -1,0 +1,74 @@
+#!/bin/bash
+#SBATCH --job-name=fdtd_photonics
+#SBATCH --partition=compute
+#SBATCH --array=1-40%16
+#SBATCH --ntasks=16
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=32G
+#SBATCH --time=04:00:00
+#SBATCH --output=logs/fdtd_%A_%a.out
+#SBATCH --error=logs/fdtd_%A_%a.err
+
+# ============================================================
+# FDTD (finite-difference time-domain) electromagnetic
+# simulation sweep using MEEP/MPB — e.g. optimizing a photonic
+# waveguide coupler over geometry parameters. Each array task
+# runs one geometry variant in parallel across 16 MPI ranks.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results
+
+module purge
+module load openmpi/4.1.5
+module load meep/1.28-mpi
+module load h5utils/1.13.1
+
+DESIGN_TABLE="designs.tsv"     # columns: design_id  gap_nm  width_nm  taper_len_um
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+# ---- Generate the design sweep table once ----
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$DESIGN_TABLE" ]; then
+    python3 - <<'EOF'
+import itertools
+gaps = [100, 150, 200, 250]
+widths = [400, 450, 500, 550, 600]
+tapers = [5, 10]
+rows = []
+for i, (g, w, t) in enumerate(itertools.product(gaps, widths, tapers), start=1):
+    rows.append(f"{i}\t{g}\t{w}\t{t}")
+with open("designs.tsv", "w") as f:
+    f.write("id\tgap_nm\twidth_nm\ttaper_len_um\n")
+    f.write("\n".join(rows) + "\n")
+EOF
+fi
+
+for i in {1..20}; do
+    [ -f "$DESIGN_TABLE" ] && break
+    sleep 2
+done
+
+LINE=$((TASK_ID + 1))
+read -r ID GAP WIDTH TAPER <<< "$(sed -n "${LINE}p" "$DESIGN_TABLE")"
+echo "=== Design $ID: gap=${GAP}nm width=${WIDTH}nm taper=${TAPER}um ==="
+
+RESULT_DIR="results/design_${ID}"
+mkdir -p "$RESULT_DIR"
+
+# ---- Run MEEP FDTD simulation via mpirun (Python control script + Scheme/Meep core) ----
+mpirun -np "$SLURM_NTASKS" python3 waveguide_coupler.py \
+    --gap-nm "$GAP" \
+    --width-nm "$WIDTH" \
+    --taper-length-um "$TAPER" \
+    --resolution 40 \
+    --output-dir "$RESULT_DIR" \
+    --until-after-sources 200
+
+# ---- Extract coupling efficiency from output flux data ----
+python3 extract_transmission.py \
+    --flux-file "${RESULT_DIR}/flux_data.h5" \
+    --output "${RESULT_DIR}/coupling_efficiency.json"
+
+echo "Design $ID done at $(date). Results in $RESULT_DIR"
+# After the full array completes, aggregate with:
+#   python3 aggregate_designs.py --results-dir results --output design_sweep_summary.csv

@@ -1,0 +1,114 @@
+#!/bin/bash
+# ============================================================
+# Driver for a heterogeneous data pipeline that spans multiple
+# SLURM jobs with dependencies:
+#   1. Ingest & validate raw data (CPU, array job over shards)
+#   2. Feature engineering (CPU, depends on step 1 - afterok)
+#   3. Model scoring (GPU, depends on step 2 - afterok)
+#   4. Report generation (CPU, depends on step 3 - afterok,
+#      runs even if step 3 partially failed via afterany + check)
+# Submit this script from the login node: bash 10_etl_pipeline_driver.sh
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs data/raw data/features data/scores reports
+
+N_SHARDS=20
+
+echo "=== Stage 1: Ingest & validate (array 1-${N_SHARDS}) ==="
+JOB1=$(sbatch --parsable \
+    --job-name=etl_ingest \
+    --partition=compute \
+    --array=1-${N_SHARDS} \
+    --cpus-per-task=4 \
+    --mem=16G \
+    --time=01:00:00 \
+    --output=logs/%x_%A_%a.out \
+    --error=logs/%x_%A_%a.err \
+    --wrap='
+        set -euo pipefail
+        SHARD=$SLURM_ARRAY_TASK_ID
+        module load python/3.11
+        python3 ingest_validate.py \
+            --shard-id "$SHARD" \
+            --input "data/raw/shard_${SHARD}.parquet" \
+            --output "data/features/validated_${SHARD}.parquet" \
+            --schema schema.json
+    ')
+echo "Stage 1 submitted: $JOB1"
+
+echo "=== Stage 2: Feature engineering (depends on stage 1) ==="
+JOB2=$(sbatch --parsable \
+    --dependency=afterok:${JOB1} \
+    --job-name=etl_features \
+    --partition=compute \
+    --cpus-per-task=32 \
+    --mem=128G \
+    --time=02:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load python/3.11
+        python3 build_features.py \
+            --input-dir data/features \
+            --output data/features/combined_features.parquet \
+            --n-jobs 32
+    ')
+echo "Stage 2 submitted: $JOB2 (depends on afterok:${JOB1})"
+
+echo "=== Stage 3: Model scoring on GPU (depends on stage 2) ==="
+JOB3=$(sbatch --parsable \
+    --dependency=afterok:${JOB2} \
+    --job-name=etl_score \
+    --partition=gpu \
+    --gres=gpu:1 \
+    --cpus-per-task=8 \
+    --mem=64G \
+    --time=03:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load cuda/12.2
+        module load anaconda3/2024.02
+        source activate scoring_env
+        python3 score_model.py \
+            --features data/features/combined_features.parquet \
+            --model-path /projects/myuser/models/scorer_v3.pt \
+            --output data/scores/predictions.parquet \
+            --batch-size 8192
+    ')
+echo "Stage 3 submitted: $JOB3 (depends on afterok:${JOB2})"
+
+echo "=== Stage 4: Report generation (runs after stage 3, regardless of its exit code) ==="
+JOB4=$(sbatch --parsable \
+    --dependency=afterany:${JOB3} \
+    --job-name=etl_report \
+    --partition=compute \
+    --cpus-per-task=4 \
+    --mem=16G \
+    --time=00:30:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load python/3.11
+        # Check whether the scoring stage actually succeeded
+        SCORE_STATE=$(sacct -j '"${JOB3}"' --format=State --noheader | head -n1 | tr -d " ")
+        if [[ "$SCORE_STATE" != COMPLETED* ]]; then
+            echo "[WARN] Scoring stage state was: $SCORE_STATE. Generating failure report."
+            python3 generate_report.py --status FAILED --job-id '"${JOB3}"' \
+                --output reports/pipeline_report_'"${JOB3}"'.html
+            exit 1
+        fi
+        python3 generate_report.py \
+            --scores data/scores/predictions.parquet \
+            --output reports/pipeline_report_'"${JOB3}"'.html
+    ')
+echo "Stage 4 submitted: $JOB4 (depends on afterany:${JOB3})"
+
+echo ""
+echo "Full pipeline submitted. Job chain: $JOB1 -> $JOB2 -> $JOB3 -> $JOB4"
+echo "Monitor with: squeue -u \$USER --start"
+echo "Trace dependencies with: sacct -j ${JOB1},${JOB2},${JOB3},${JOB4} --format=JobID,JobName,State,Elapsed"

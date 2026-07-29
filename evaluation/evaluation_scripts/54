@@ -1,0 +1,85 @@
+#!/bin/bash
+#SBATCH --job-name=variant_call
+#SBATCH --partition=bigmem
+#SBATCH --array=1-24
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64G
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/vc_%A_%a.out
+#SBATCH --error=logs/vc_%A_%a.err
+
+# ============================================================
+# Whole-genome variant calling pipeline, one array task per
+# sample: align -> sort -> mark duplicates -> BQSR -> call
+# variants. Uses a sample sheet to map array index -> sample.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs tmp results
+
+SAMPLE_SHEET="samples.tsv"          # columns: sample_id  fastq_r1  fastq_r2
+SAMPLE_LINE=$((SLURM_ARRAY_TASK_ID + 1))
+read -r SAMPLE_ID FASTQ_R1 FASTQ_R2 <<< "$(sed -n "${SAMPLE_LINE}p" "$SAMPLE_SHEET")"
+
+echo "=== Processing sample: $SAMPLE_ID ==="
+REF="/references/GRCh38/genome.fa"
+KNOWN_SITES="/references/GRCh38/known_sites.vcf.gz"
+SAMPLE_TMP="tmp/${SAMPLE_ID}"
+mkdir -p "$SAMPLE_TMP" "results/${SAMPLE_ID}"
+
+module purge
+module load bwa/0.7.17
+module load samtools/1.19
+module load gatk/4.5.0
+module load picard/3.1.1
+
+# ---- 1. Alignment ----
+echo "[1/5] Aligning reads with BWA-MEM"
+bwa mem -t "$SLURM_CPUS_PER_TASK" -R "@RG\tID:${SAMPLE_ID}\tSM:${SAMPLE_ID}\tPL:ILLUMINA" \
+    "$REF" "$FASTQ_R1" "$FASTQ_R2" \
+    | samtools sort -@ "$SLURM_CPUS_PER_TASK" -o "${SAMPLE_TMP}/aligned.sorted.bam" -
+
+samtools index "${SAMPLE_TMP}/aligned.sorted.bam"
+
+# ---- 2. Mark duplicates ----
+echo "[2/5] Marking duplicates"
+picard MarkDuplicates \
+    I="${SAMPLE_TMP}/aligned.sorted.bam" \
+    O="${SAMPLE_TMP}/dedup.bam" \
+    M="${SAMPLE_TMP}/dup_metrics.txt"
+samtools index "${SAMPLE_TMP}/dedup.bam"
+
+# ---- 3. Base quality score recalibration ----
+echo "[3/5] Running BQSR"
+gatk BaseRecalibrator \
+    -I "${SAMPLE_TMP}/dedup.bam" \
+    -R "$REF" \
+    --known-sites "$KNOWN_SITES" \
+    -O "${SAMPLE_TMP}/recal.table"
+
+gatk ApplyBQSR \
+    -I "${SAMPLE_TMP}/dedup.bam" \
+    -R "$REF" \
+    --bqsr-recal-file "${SAMPLE_TMP}/recal.table" \
+    -O "${SAMPLE_TMP}/recal.bam"
+
+# ---- 4. Variant calling ----
+echo "[4/5] Calling variants with HaplotypeCaller"
+gatk HaplotypeCaller \
+    -I "${SAMPLE_TMP}/recal.bam" \
+    -R "$REF" \
+    -O "results/${SAMPLE_ID}/${SAMPLE_ID}.g.vcf.gz" \
+    -ERC GVCF \
+    --native-pair-hmm-threads "$SLURM_CPUS_PER_TASK"
+
+# ---- 5. QC metrics ----
+echo "[5/5] Collecting QC metrics"
+samtools flagstat "${SAMPLE_TMP}/recal.bam" > "results/${SAMPLE_ID}/flagstat.txt"
+samtools depth -a "${SAMPLE_TMP}/recal.bam" | \
+    awk '{sum+=$3; n++} END {print "mean_depth:", sum/n}' > "results/${SAMPLE_ID}/depth_summary.txt"
+
+# ---- Cleanup intermediate files, keep final gVCF + QC ----
+rm -rf "$SAMPLE_TMP"
+
+echo "Sample $SAMPLE_ID complete: $(date)"

@@ -1,0 +1,11 @@
+#!/bin/bash
+#SBATCH --job_name=fireworks_vasp
+#SBATCH --partition=workflow
+#SBATCH --cpus-per-task=48
+#SBATCH --mem=256G
+#SBATCH --time=168:00:00
+
+export FW_CONFIG_FILE=/opt/fireworks/config.json
+export LPAD_FILE=/project/db/launchpad.yaml
+
+python vasp_workflow.py -q dual_gpu --config_file vasp_config.yaml

@@ -1,0 +1,84 @@
+#!/bin/bash
+#SBATCH --job-name=flash_amr_ccsn
+#SBATCH --partition=compute
+#SBATCH --nodes=32
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --signal=B:USR1@600
+
+# ============================================================
+# FLASH adaptive-mesh-refinement (AMR) simulation of core-
+# collapse supernova dynamics (multi-physics: hydro + gravity
+# + neutrino transport). Uses block-structured AMR with
+# dynamic load balancing; chains job segments via FLASH's
+# native checkpoint/restart files until the target physical
+# post-bounce time is reached.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load hdf5/1.14.0-mpi
+module load hypre/2.29.0
+
+CASE_DIR="/projects/myuser/flash/ccsn_15Msun"
+cd "$CASE_DIR"
+
+TARGET_POSTBOUNCE_MS=500
+
+echo "=== FLASH AMR segment: $(date) ==="
+
+# ---- Signal handler: request FLASH to checkpoint gracefully near timeout ----
+checkpoint_handler() {
+    echo "[SIGNAL] Wall-time warning - writing dump_forced request"
+    touch dump_forced
+}
+trap checkpoint_handler USR1
+
+# ---- Determine restart checkpoint ----
+LATEST_CHK=$(ls -v ccsn_hdf5_chk_* 2>/dev/null | tail -n1 || true)
+
+if [ -n "$LATEST_CHK" ]; then
+    echo "Restarting from: $LATEST_CHK"
+    sed -i "s/^restart\s*=.*/restart = .true./" flash.par
+    sed -i "s/^checkpointFileNumber\s*=.*/checkpointFileNumber = $(echo $LATEST_CHK | grep -oP 'chk_\K[0-9]+')/" flash.par
+else
+    echo "Starting fresh from progenitor model"
+    sed -i "s/^restart\s*=.*/restart = .false./" flash.par
+fi
+
+# ---- Run FLASH ----
+srun --mpi=pmix ./flash4 -par_file flash.par &
+FLASH_PID=$!
+wait $FLASH_PID
+
+# ---- Check current post-bounce time from the latest checkpoint's metadata ----
+LATEST_CHK=$(ls -v ccsn_hdf5_chk_* | tail -n1)
+POSTBOUNCE_MS=$(python3 -c "
+import h5py
+with h5py.File('${LATEST_CHK}', 'r') as f:
+    t_bounce = f['real scalars'][()]
+    print('extract handled in analysis script')
+" 2>/dev/null || echo "0")
+
+POSTBOUNCE_MS=$(python3 extract_postbounce_time.py --checkpoint "$LATEST_CHK")
+echo "Post-bounce time reached: ${POSTBOUNCE_MS} ms / ${TARGET_POSTBOUNCE_MS} ms target"
+
+rm -f dump_forced
+
+if awk -v c="$POSTBOUNCE_MS" -v t="$TARGET_POSTBOUNCE_MS" 'BEGIN{exit !(c < t)}'; then
+    echo "Target not reached - resubmitting next segment"
+    sbatch "$0"
+else
+    echo "Target post-bounce time reached. Running explosion diagnostics."
+    python3 analyze_explosion_energetics.py \
+        --checkpoint-dir . \
+        --output analysis/explosion_diagnostics.json
+fi
+
+echo "=== Segment finished: $(date) ==="

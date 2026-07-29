@@ -1,0 +1,75 @@
+#!/bin/bash
+#SBATCH --job-name=rnaseq
+#SBATCH --partition=compute
+#SBATCH --array=1-96%20
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=06:00:00
+#SBATCH --output=logs/rnaseq_%A_%a.out
+#SBATCH --error=logs/rnaseq_%A_%a.err
+
+# ============================================================
+# RNA-seq quantification pipeline: QC -> trim -> pseudoalign
+# (Salmon) -> per-sample gene counts. Skips samples that fail
+# a minimum read-quality gate, logging them for manual review.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results failed_qc
+
+SAMPLE_SHEET="rnaseq_samples.tsv"     # sample_id  fastq_r1  fastq_r2  condition
+LINE=$((SLURM_ARRAY_TASK_ID + 1))
+read -r SAMPLE_ID R1 R2 CONDITION <<< "$(sed -n "${LINE}p" "$SAMPLE_SHEET")"
+
+echo "=== Sample $SAMPLE_ID (condition: $CONDITION) ==="
+
+module purge
+module load fastqc/0.12.1
+module load trimgalore/0.6.10
+module load salmon/1.10.2
+
+WORKDIR="tmp/${SAMPLE_ID}"
+mkdir -p "$WORKDIR" "results/${SAMPLE_ID}"
+
+# ---- 1. QC ----
+echo "[1/4] Running FastQC"
+fastqc -o "$WORKDIR" -t "$SLURM_CPUS_PER_TASK" "$R1" "$R2"
+
+# ---- QC gate: parse % duplication / adapter content ----
+DUP_PCT=$(unzip -p "${WORKDIR}"/*_fastqc.zip '*/fastqc_data.txt' 2>/dev/null \
+    | grep -A1 "Total Deduplicated Percentage" | tail -n1 | awk '{print $1}' || echo "0")
+
+MIN_DEDUP=50
+if awk -v d="$DUP_PCT" -v m="$MIN_DEDUP" 'BEGIN{exit !(d < m)}'; then
+    echo "[WARN] Sample $SAMPLE_ID failed QC gate (dedup=${DUP_PCT}% < ${MIN_DEDUP}%)"
+    echo -e "${SAMPLE_ID}\t${DUP_PCT}" >> failed_qc/failed_samples.tsv
+    exit 0
+fi
+
+# ---- 2. Adapter/quality trimming ----
+echo "[2/4] Trimming reads"
+trim_galore --paired --cores "$SLURM_CPUS_PER_TASK" \
+    --output_dir "$WORKDIR" "$R1" "$R2"
+
+TRIMMED_R1=$(ls "${WORKDIR}"/*_val_1.fq.gz)
+TRIMMED_R2=$(ls "${WORKDIR}"/*_val_2.fq.gz)
+
+# ---- 3. Pseudoalignment + quantification ----
+echo "[3/4] Quantifying with Salmon"
+salmon quant \
+    -i /references/salmon_index_grch38 \
+    -l A \
+    -1 "$TRIMMED_R1" -2 "$TRIMMED_R2" \
+    -p "$SLURM_CPUS_PER_TASK" \
+    --validateMappings \
+    --gcBias \
+    -o "results/${SAMPLE_ID}/salmon_quant"
+
+# ---- 4. Record metadata for downstream differential expression ----
+echo "[4/4] Recording sample metadata"
+echo -e "${SAMPLE_ID}\t${CONDITION}\tresults/${SAMPLE_ID}/salmon_quant/quant.sf" \
+    >> results/sample_manifest.tsv
+
+rm -rf "$WORKDIR"
+echo "Sample $SAMPLE_ID complete at $(date)"

@@ -1,0 +1,75 @@
+#!/bin/bash
+#SBATCH --job-name=mc_sweep
+#SBATCH --partition=compute
+#SBATCH --array=1-500%50            # 500 tasks, max 50 concurrent
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/mc_%A_%a.out
+#SBATCH --error=logs/mc_%A_%a.err
+
+# ============================================================
+# Monte Carlo parameter sweep using a SLURM job array.
+# Each array task reads one row from a parameter table and
+# runs an independent simulation with a unique random seed.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs results
+
+PARAM_FILE="params.tsv"
+TASK_ID="$SLURM_ARRAY_TASK_ID"
+
+# ---- Generate parameter table once (only array task 1 does this) ----
+if [ "$TASK_ID" -eq 1 ] && [ ! -f "$PARAM_FILE" ]; then
+    echo "Generating parameter sweep table"
+    python3 - <<'EOF'
+import itertools, random
+
+temps = [280, 300, 320, 340, 360]
+pressures = [1.0, 2.5, 5.0]
+concentrations = [0.01, 0.05, 0.1]
+
+rows = []
+for t, p, c in itertools.product(temps, pressures, concentrations):
+    for rep in range(12):  # replicate each condition
+        seed = random.randint(1, 10**9)
+        rows.append(f"{t}\t{p}\t{c}\t{seed}")
+
+with open("params.tsv", "w") as f:
+    f.write("temperature\tpressure\tconcentration\tseed\n")
+    f.write("\n".join(rows[:500]) + "\n")
+EOF
+fi
+
+# ---- Wait briefly for the param file if this isn't task 1 ----
+for i in {1..30}; do
+    [ -f "$PARAM_FILE" ] && break
+    sleep 2
+done
+
+# ---- Extract this task's parameters (line = TASK_ID + 1 for header) ----
+LINE_NUM=$((TASK_ID + 1))
+PARAMS=$(sed -n "${LINE_NUM}p" "$PARAM_FILE")
+TEMP=$(echo "$PARAMS" | cut -f1)
+PRESSURE=$(echo "$PARAMS" | cut -f2)
+CONC=$(echo "$PARAMS" | cut -f3)
+SEED=$(echo "$PARAMS" | cut -f4)
+
+echo "Task $TASK_ID: T=$TEMP P=$PRESSURE C=$CONC seed=$SEED"
+
+module load python/3.11
+
+OUT="results/run_${TASK_ID}.json"
+python3 monte_carlo_sim.py \
+    --temperature "$TEMP" \
+    --pressure "$PRESSURE" \
+    --concentration "$CONC" \
+    --seed "$SEED" \
+    --n-samples 1000000 \
+    --output "$OUT"
+
+echo "Task $TASK_ID wrote $OUT"
+
+# ---- Last array task triggers aggregation via job dependency (see script 04) ----

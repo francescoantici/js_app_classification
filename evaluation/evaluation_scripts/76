@@ -1,0 +1,87 @@
+#!/bin/bash
+#SBATCH --job-name=genome_assembly
+#SBATCH --partition=bigmem
+#SBATCH --nodes=1
+#SBATCH --ntasks=64
+#SBATCH --mem=1500G
+#SBATCH --time=72:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# De novo genome assembly from long-read (ONT/PacBio HiFi)
+# sequencing data: correction -> assembly -> polishing ->
+# scaffolding -> QC (BUSCO). High memory footprint due to
+# overlap graph construction on large eukaryotic genomes.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs assembly
+
+module purge
+module load hifiasm/0.19.8
+module load minimap2/2.27
+module load samtools/1.19
+module load busco/5.7.1
+module load quast/5.2.0
+
+CASE_DIR="/projects/myuser/genomics/species_x_assembly"
+cd "$CASE_DIR"
+
+HIFI_READS="reads/hifi_reads.fastq.gz"
+ONT_READS="reads/ont_ultralong.fastq.gz"
+
+echo "=== Genome assembly job: $(date) ==="
+echo "Threads: $SLURM_NTASKS | Memory: 1.5TB"
+
+# ---- 1. Primary assembly with hifiasm (HiFi + ultra-long ONT) ----
+echo "[1/4] Running hifiasm assembly"
+hifiasm -o assembly/species_x \
+    -t "$SLURM_NTASKS" \
+    --ul "$ONT_READS" \
+    "$HIFI_READS" \
+    2> logs/hifiasm.log
+
+# ---- Convert primary contig graph to FASTA ----
+awk '/^S/{print ">"$2"\n"$3}' assembly/species_x.bp.p_ctg.gfa > assembly/species_x.contigs.fasta
+
+# ---- 2. Assembly statistics ----
+echo "[2/4] Computing assembly statistics with QUAST"
+quast.py assembly/species_x.contigs.fasta \
+    -o assembly/quast_report \
+    --threads "$SLURM_NTASKS" \
+    --large \
+    --est-ref-size 2800000000
+
+N50=$(grep "N50" assembly/quast_report/report.txt | awk '{print $2}')
+NUM_CONTIGS=$(grep "^# contigs" assembly/quast_report/report.txt | tail -n1 | awk '{print $3}')
+echo "Assembly N50: $N50 | Contigs: $NUM_CONTIGS"
+
+# ---- QC gate: fail early if fragmentation is extreme ----
+if [ "$NUM_CONTIGS" -gt 50000 ]; then
+    echo "[WARN] Assembly is highly fragmented (${NUM_CONTIGS} contigs). Review before proceeding to BUSCO."
+fi
+
+# ---- 3. Completeness assessment with BUSCO ----
+echo "[3/4] Running BUSCO completeness assessment"
+busco -i assembly/species_x.contigs.fasta \
+    -o busco_species_x \
+    -m genome \
+    -l vertebrata_odb10 \
+    -c "$SLURM_NTASKS" \
+    --out_path assembly
+
+BUSCO_COMPLETE=$(grep "Complete BUSCOs" assembly/busco_species_x/short_summary*.txt | awk '{print $1}')
+echo "BUSCO complete: ${BUSCO_COMPLETE}"
+
+# ---- 4. Map long reads back for coverage/misassembly check ----
+echo "[4/4] Mapping reads back for coverage validation"
+minimap2 -ax map-hifi -t "$SLURM_NTASKS" \
+    assembly/species_x.contigs.fasta "$HIFI_READS" \
+    | samtools sort -@ "$SLURM_NTASKS" -o assembly/readback.sorted.bam -
+samtools index assembly/readback.sorted.bam
+samtools depth -a assembly/readback.sorted.bam | \
+    awk '{sum+=$3; n++} END {print "mean_coverage:", sum/n}' > assembly/coverage_summary.txt
+
+echo "=== Assembly pipeline finished: $(date) ==="
+echo "Final assembly: assembly/species_x.contigs.fasta"

@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=gromacs_membrane
+#SBATCH --partition=gpu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:a100:8
+#SBATCH --time=48:00:00
+
+cd $SLURM_SUBMIT_DIR
+
+apptainer exec --nv --bind /scratch:/scratch gromacs-2023.sif     gmx mdrun -v -deffnm md_membrane -ntomp 8 -nb gpu -bonded gpu -pme gpu

@@ -1,0 +1,93 @@
+#!/bin/bash
+#SBATCH --job-name=nyx_amr_cosmo
+#SBATCH --partition=compute
+#SBATCH --nodes=24
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --signal=B:USR1@300
+
+# ============================================================
+# Nyx: AMReX-based adaptive-mesh-refinement cosmological
+# hydrodynamics simulation (baryons + dark matter + gravity),
+# used for e.g. Lyman-alpha forest / IGM studies. Distinct from
+# pure N-body: couples a block-structured AMR Euler solver to
+# a particle-mesh gravity solver. Chains segments by scale
+# factor until z=0.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load hdf5/1.14.0-mpi
+module load amrex/24.06
+
+CASE_DIR="/projects/myuser/nyx/lya_forest_box_100Mpc"
+cd "$CASE_DIR"
+
+echo "=== Nyx AMR cosmological hydro segment: $(date) ==="
+
+# ---- Signal handler for graceful AMR checkpoint before timeout ----
+checkpoint_handler() {
+    echo "[SIGNAL] Wall-time warning - Nyx will checkpoint at next coarse step"
+    touch nyx_stop_requested
+}
+trap checkpoint_handler USR1
+
+# ---- Determine restart checkpoint (AMReX plotfile/checkpoint naming) ----
+LATEST_CHK=$(ls -d chk[0-9]* 2>/dev/null | sort -V | tail -n1 || true)
+
+if [ -n "$LATEST_CHK" ]; then
+    echo "Restarting from: $LATEST_CHK"
+    RESTART_LINE="amr.restart = ${LATEST_CHK}"
+else
+    echo "Starting fresh from initial conditions (MUSIC-generated ICs)"
+    RESTART_LINE=""
+fi
+
+# ---- Build inputs file for this segment ----
+cat > inputs_segment <<EOF
+max_step = 100000
+stop_time = -1
+nyx.final_a = 1.0
+
+amr.n_cell = 1024 1024 1024
+amr.max_level = 4
+amr.ref_ratio = 2 2 2 2
+amr.regrid_int = 2
+
+nyx.do_hydro = 1
+nyx.do_grav = 1
+gravity.gravity_type = PoissonGrav
+
+amr.check_int = 20
+amr.plot_int = 100
+${RESTART_LINE}
+EOF
+
+# ---- Run Nyx ----
+srun --mpi=pmix ./Nyx3d.gnu.MPI.ex inputs_segment
+
+# ---- Determine current scale factor reached ----
+LATEST_CHK=$(ls -d chk[0-9]* | sort -V | tail -n1)
+CURRENT_A=$(python3 extract_scale_factor.py --checkpoint "$LATEST_CHK")
+echo "Scale factor reached: a = $CURRENT_A (target a = 1.0)"
+
+rm -f nyx_stop_requested
+
+if awk -v a="$CURRENT_A" 'BEGIN{exit !(a < 0.999)}'; then
+    echo "z=0 not yet reached - resubmitting next segment"
+    sbatch "$0"
+else
+    echo "Reached z=0. Running Lyman-alpha forest flux statistics."
+    module load python/3.11
+    python3 compute_lya_flux_power.py \
+        --checkpoint "$LATEST_CHK" \
+        --output analysis/lya_flux_power_spectrum.json
+fi
+
+echo "=== Segment finished: $(date) ==="

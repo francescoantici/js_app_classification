@@ -1,0 +1,72 @@
+#!/bin/bash
+# ============================================================
+# Driver for a high-energy physics simulation + reconstruction
+# pipeline: Geant4 detector Monte Carlo (embarrassingly
+# parallel array job over event batches) followed by a
+# dependent ROOT-based analysis/histogramming job that only
+# runs once every batch has produced its output ntuple.
+# Run from login node: bash 30_geant4_hep_simulation.sh
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs ntuples plots
+
+N_BATCHES=200
+EVENTS_PER_BATCH=50000
+
+echo "=== Stage 1: Geant4 detector simulation (${N_BATCHES} batches) ==="
+SIM_JOBID=$(sbatch --parsable \
+    --job-name=geant4_sim \
+    --partition=compute \
+    --array=1-${N_BATCHES}%40 \
+    --cpus-per-task=1 \
+    --mem=4G \
+    --time=03:00:00 \
+    --output=logs/g4sim_%A_%a.out \
+    --error=logs/g4sim_%A_%a.err \
+    --wrap='
+        set -euo pipefail
+        module load geant4/11.2
+        module load root/6.30.06
+
+        BATCH=$SLURM_ARRAY_TASK_ID
+        SEED=$((BATCH * 7919 + 17))
+
+        ./DetectorSim -m run_calorimeter.mac \
+            -seed ${SEED} \
+            -nEvents '"${EVENTS_PER_BATCH}"' \
+            -o ntuples/batch_${BATCH}.root
+
+        # Sanity check: verify the ROOT file is readable and has entries
+        root -l -b -q "check_ntuple.C(\"ntuples/batch_${BATCH}.root\")"
+    ')
+echo "Simulation array submitted: $SIM_JOBID"
+
+echo "=== Stage 2: ROOT analysis & histogramming (depends on all batches) ==="
+ANALYSIS_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${SIM_JOBID} \
+    --job-name=geant4_analysis \
+    --partition=compute \
+    --cpus-per-task=16 \
+    --mem=64G \
+    --time=02:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load root/6.30.06
+
+        echo "Merging '"${N_BATCHES}"' ntuple batches..."
+        hadd -f ntuples/merged_all.root ntuples/batch_*.root
+
+        echo "Running physics analysis macro (energy resolution, efficiency)"
+        root -l -b -q "analyze_calorimeter.C(\"ntuples/merged_all.root\", \"plots/\")"
+
+        echo "Generating summary report"
+        python3 summarize_results.py \
+            --root-file ntuples/merged_all.root \
+            --output plots/summary_report.pdf
+    ')
+echo "Analysis job submitted: $ANALYSIS_JOBID (depends on afterok:${SIM_JOBID})"
+echo "Chain: $SIM_JOBID (array of ${N_BATCHES}) -> $ANALYSIS_JOBID"
+echo "Total events simulated: $((N_BATCHES * EVENTS_PER_BATCH))"

@@ -1,0 +1,66 @@
+#!/bin/bash
+#SBATCH --job-name=vasp_relax
+#SBATCH --partition=compute
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=24
+#SBATCH --cpus-per-task=2
+#SBATCH --time=48:00:00
+#SBATCH --mem=0
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# VASP plane-wave DFT structural relaxation. Uses hybrid
+# MPI (NCORE-style k-point/band parallelization) + OpenMP,
+# with automatic restart from WAVECAR/CONTCAR if an earlier
+# segment ran out of wall time before ionic convergence.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load intel/2023.2
+module load intel-mpi/2021.10
+module load vasp/6.4.2-std
+
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export I_MPI_PIN_DOMAIN=omp
+
+CASE_DIR="/projects/myuser/vasp/perovskite_relax"
+cd "$CASE_DIR"
+
+echo "=== VASP job: $(date) ==="
+echo "Ranks: $SLURM_NTASKS | OMP threads/rank: $OMP_NUM_THREADS"
+
+# ---- Restart logic: reuse WAVECAR/CHGCAR, update POSCAR from CONTCAR ----
+if [ -f CONTCAR ] && [ -s CONTCAR ]; then
+    echo "Found previous CONTCAR - continuing relaxation"
+    cp CONTCAR POSCAR
+    sed -i 's/^ISTART.*/ISTART = 1/' INCAR
+    sed -i 's/^ICHARG.*/ICHARG = 0/' INCAR
+else
+    echo "No previous CONTCAR - starting fresh relaxation"
+fi
+
+# ---- Set NCORE for band parallelization (rule of thumb: sqrt(ntasks)) ----
+NCORE_VAL=$(python3 -c "import math; print(max(1,int(math.sqrt($SLURM_NTASKS))))")
+sed -i "s/^NCORE.*/NCORE = ${NCORE_VAL}/" INCAR || echo "NCORE = ${NCORE_VAL}" >> INCAR
+
+# ---- Run VASP ----
+srun --mpi=pmi2 vasp_std > vasp_stdout.log 2>&1
+
+# ---- Check ionic convergence ----
+REACHED_EDIFFG=$(grep -c "reached required accuracy" OUTCAR || true)
+
+if [ "$REACHED_EDIFFG" -ge 1 ]; then
+    echo "Ionic relaxation converged."
+    cp CONTCAR POSCAR.converged
+    cp OSZICAR OSZICAR.final
+else
+    echo "Relaxation not yet converged within this wall-time segment."
+    echo "Resubmitting continuation job..."
+    sbatch "$0"
+fi
+
+echo "=== VASP job segment finished: $(date) ==="

@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -N lammps_polymer_sweep
+#PBS -l select=1:ncpus=16:mpiprocs=16
+#PBS -l walltime=12:00:00
+#PBS -J 273-373:10
+
+cd $PBS_O_WORKDIR
+module load lammps/2023.08.03
+
+export OMP_NUM_THREADS=4
+
+mpirun -np 4 lmp_mpi -in polymer_sweep.in     -var temperature $PBS_ARRAY_INDEX     -log log.lammps.$PBS_ARRAY_INDEX

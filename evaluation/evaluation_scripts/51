@@ -1,0 +1,85 @@
+#!/bin/bash
+#SBATCH --job-name=mpi_sim
+#SBATCH --partition=compute
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=1
+#SBATCH --time=12:00:00
+#SBATCH --mem=0                     # use all available memory on node
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=you@example.edu
+#SBATCH --exclusive
+
+# ============================================================
+# Large-scale MPI simulation (e.g. CFD/weather solver)
+# Stages input to fast local/scratch storage, runs solver,
+# and archives results back to project space.
+# ============================================================
+
+set -euo pipefail
+trap 'echo "[ERROR] line $LINENO: command failed" >&2' ERR
+
+mkdir -p logs
+
+echo "=== Job Info ==="
+echo "Job ID:       $SLURM_JOB_ID"
+echo "Nodes:        $SLURM_JOB_NODELIST"
+echo "Total tasks:  $SLURM_NTASKS"
+echo "Start time:   $(date)"
+
+# ---- Environment setup ----
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load hdf5/1.14.0-mpi
+
+PROJECT_DIR="/projects/myuser/simulation"
+SCRATCH_DIR="/scratch/${USER}/${SLURM_JOB_ID}"
+INPUT_DECK="${PROJECT_DIR}/input/case_001.deck"
+
+mkdir -p "$SCRATCH_DIR"
+cd "$SCRATCH_DIR"
+
+# ---- Stage input data to scratch (fast I/O) ----
+echo "Staging input data to $SCRATCH_DIR"
+cp "$INPUT_DECK" .
+cp -r "${PROJECT_DIR}/mesh" .
+
+# ---- Run the MPI solver ----
+echo "=== Launching solver ==="
+srun --mpi=pmix \
+     "${PROJECT_DIR}/bin/solver" \
+     --input case_001.deck \
+     --mesh ./mesh \
+     --checkpoint-every 500 \
+     --output ./results
+
+SOLVER_STATUS=$?
+
+if [ $SOLVER_STATUS -ne 0 ]; then
+    echo "[FATAL] Solver exited with status $SOLVER_STATUS" >&2
+    exit $SOLVER_STATUS
+fi
+
+# ---- Post-process: reduce distributed output files ----
+echo "=== Post-processing results ==="
+module load python/3.11
+python3 "${PROJECT_DIR}/scripts/merge_hdf5.py" \
+    --input-dir ./results \
+    --output "./results/merged_${SLURM_JOB_ID}.h5"
+
+# ---- Archive results back to project space ----
+ARCHIVE_DIR="${PROJECT_DIR}/results/${SLURM_JOB_ID}"
+mkdir -p "$ARCHIVE_DIR"
+cp ./results/merged_*.h5 "$ARCHIVE_DIR/"
+cp ./logs/* "$ARCHIVE_DIR/" 2>/dev/null || true
+
+# ---- Cleanup scratch ----
+echo "Cleaning up scratch directory"
+cd /
+rm -rf "$SCRATCH_DIR"
+
+echo "End time: $(date)"
+echo "Job completed successfully. Results archived to $ARCHIVE_DIR"

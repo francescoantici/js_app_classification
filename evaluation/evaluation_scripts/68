@@ -1,0 +1,92 @@
+#!/bin/bash
+#SBATCH --job-name=fwi_seismic
+#SBATCH --partition=compute
+#SBATCH --nodes=12
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=48:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Seismic Full-Waveform Inversion (FWI): iterative gradient-
+# based optimization over many source shots. Each SLURM
+# segment runs a fixed number of L-BFGS iterations, forward-
+# modeling all shots in parallel via MPI, then checkpoints the
+# velocity model before chaining the next segment.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs models gradients
+
+module purge
+module load gcc/12.2.0
+module load openmpi/4.1.5
+module load petsc/3.20.0
+
+CASE_DIR="/projects/myuser/seismic/fwi_field_survey"
+cd "$CASE_DIR"
+
+TARGET_ITERS=100
+ITERS_PER_SEGMENT=10
+N_SHOTS=240
+
+echo "=== FWI segment starting: $(date) ==="
+
+# ---- Determine current iteration from checkpoint ----
+LATEST_MODEL=$(ls -v models/vp_iter*.bin 2>/dev/null | tail -n1 || true)
+if [ -n "$LATEST_MODEL" ]; then
+    CURRENT_ITER=$(echo "$LATEST_MODEL" | grep -oP 'iter\K[0-9]+')
+    echo "Resuming from iteration $CURRENT_ITER: $LATEST_MODEL"
+else
+    CURRENT_ITER=0
+    echo "Starting from initial velocity model"
+    cp models/vp_initial.bin models/vp_iter0.bin
+fi
+
+END_ITER=$((CURRENT_ITER + ITERS_PER_SEGMENT))
+if [ "$END_ITER" -gt "$TARGET_ITERS" ]; then
+    END_ITER=$TARGET_ITERS
+fi
+
+echo "Running iterations ${CURRENT_ITER} -> ${END_ITER} over ${N_SHOTS} shots"
+
+# ---- Run FWI driver: distributes shots across MPI ranks,   ----
+# ---- computes forward/adjoint wavefields and L-BFGS update ----
+srun --mpi=pmix ./fwi_driver \
+    --start-iter "$CURRENT_ITER" \
+    --end-iter "$END_ITER" \
+    --n-shots "$N_SHOTS" \
+    --model-dir models \
+    --gradient-dir gradients \
+    --optimizer lbfgs \
+    --lbfgs-memory 10 \
+    --step-length-init 0.01 \
+    --checkpoint-every-iter
+
+FWI_STATUS=$?
+if [ $FWI_STATUS -ne 0 ]; then
+    echo "[ERROR] FWI driver exited with status $FWI_STATUS" >&2
+    exit $FWI_STATUS
+fi
+
+# ---- Check misfit reduction ----
+python3 - <<EOF
+import json
+with open("gradients/misfit_history.json") as f:
+    hist = json.load(f)
+print(f"Misfit at iter {hist[-1]['iter']}: {hist[-1]['misfit']:.6e}")
+EOF
+
+# ---- Chain next segment or finish ----
+if [ "$END_ITER" -lt "$TARGET_ITERS" ]; then
+    echo "Resubmitting for iterations ${END_ITER}+"
+    sbatch "$0"
+else
+    echo "Target iteration count reached ($TARGET_ITERS). Generating final model plots."
+    module load python/3.11
+    python3 plot_velocity_model.py \
+        --model "models/vp_iter${END_ITER}.bin" \
+        --output "models/final_model_${SLURM_JOB_ID}.png"
+fi
+
+echo "=== FWI segment finished: $(date) ==="

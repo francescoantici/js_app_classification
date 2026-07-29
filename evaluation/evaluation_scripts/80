@@ -1,0 +1,76 @@
+#!/bin/bash
+#SBATCH --job-name=cp2k_aimd
+#SBATCH --partition=compute
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=1
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# CP2K ab initio (Born-Oppenheimer) molecular dynamics with
+# Gaussian-and-plane-wave DFT (QuickStep). Chains simulation
+# segments via CP2K's native RESTART file mechanism until the
+# target trajectory length is reached.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load intel/2023.2
+module load intel-mpi/2021.10
+module load cp2k/2024.1-psmp
+
+CASE_DIR="/projects/myuser/cp2k/liquid_water_aimd"
+cd "$CASE_DIR"
+
+TARGET_STEPS=50000
+STEPS_PER_SEGMENT=5000
+INPUT_BASE="aimd_liquid_water"
+
+echo "=== CP2K AIMD segment: $(date) ==="
+echo "Ranks: $SLURM_NTASKS"
+
+# ---- Restart logic: point to latest .restart file if present ----
+LATEST_RESTART=$(ls -v ${INPUT_BASE}-1_*.restart 2>/dev/null | tail -n1 || true)
+
+if [ -n "$LATEST_RESTART" ]; then
+    echo "Resuming from restart file: $LATEST_RESTART"
+    INPUT_FILE="${INPUT_BASE}_continue.inp"
+    sed "s#@RESTART_FILE@#${LATEST_RESTART}#" restart_template.inp > "$INPUT_FILE"
+    CURRENT_STEP=$(grep -oP 'Step_start_val\s+\K[0-9]+' "$LATEST_RESTART" || echo 0)
+else
+    echo "Starting fresh AIMD trajectory"
+    INPUT_FILE="${INPUT_BASE}.inp"
+    CURRENT_STEP=0
+fi
+
+echo "Current step: $CURRENT_STEP / target $TARGET_STEPS"
+
+# ---- Run CP2K for this segment ----
+srun --mpi=pmix cp2k.psmp -i "$INPUT_FILE" -o "output_step${CURRENT_STEP}.log"
+
+# ---- Verify normal termination ----
+if ! grep -q "PROGRAM ENDED AT" "output_step${CURRENT_STEP}.log"; then
+    echo "[ERROR] CP2K did not terminate normally" >&2
+    tail -n 50 "output_step${CURRENT_STEP}.log"
+    exit 1
+fi
+
+NEW_STEP=$((CURRENT_STEP + STEPS_PER_SEGMENT))
+
+# ---- Chain next segment or finish ----
+if [ "$NEW_STEP" -lt "$TARGET_STEPS" ]; then
+    echo "Resubmitting for steps ${NEW_STEP}+"
+    sbatch "$0"
+else
+    echo "Target trajectory length reached ($TARGET_STEPS steps)."
+    module load python/3.11
+    python3 analyze_rdf_diffusion.py \
+        --trajectory "${INPUT_BASE}-pos-1.xyz" \
+        --output analysis/water_rdf_diffusion.json
+fi
+
+echo "=== Segment finished: $(date) ==="

@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --job-name=esm_mpi_training
+#SBATCH --partition=gpu
+#SBATCH --nodes=8
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=12
+#SBATCH --gres=gpu:a100:32
+#SBATCH --time=120:00:00
+
+module load openmpi/4.1.1
+
+export MASTER_PORT=12355
+export OMP_NUM_THREADS=12
+
+mpirun -np 32 python train_esm_mpi.py     --model esm-1b     --pdb-data=/data/pdb     --batch-size=16     --epochs=50

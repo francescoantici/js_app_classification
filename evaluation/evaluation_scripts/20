@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=amber_dna_protein
+#SBATCH --partition=gpu
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:a100:2
+#SBATCH --time=168:00:00
+
+module load amber/22
+
+pmemd.cuda -O -i md.in -o md.out     -p dna_protein.prmtop     -c md.rst     -r md_final.rst     -x md.nc

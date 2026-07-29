@@ -1,0 +1,65 @@
+#!/bin/bash
+#SBATCH --job-name=lammps_md
+#SBATCH --partition=gpu
+#SBATCH --nodes=4
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# LAMMPS large-scale materials-science MD (e.g. radiation
+# damage cascade / nanoindentation) with GPU acceleration via
+# the KOKKOS package. Includes an optional strong-scaling
+# benchmark mode toggled by an environment variable.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs dumps
+
+module purge
+module load cuda/12.2
+module load openmpi/4.1.5
+module load lammps/2Aug2024-kokkos-gpu
+
+CASE_DIR="/projects/myuser/lammps/tungsten_cascade"
+cd "$CASE_DIR"
+
+TOTAL_GPUS=$((SLURM_NNODES * 4))
+echo "=== LAMMPS job: $TOTAL_GPUS GPUs across $SLURM_NNODES nodes ==="
+
+# ---- Optional: strong-scaling benchmark sweep ----
+if [ "${BENCHMARK_MODE:-0}" = "1" ]; then
+    echo "Running strong-scaling benchmark"
+    for NP in 4 8 16 32; do
+        echo "--- Benchmarking with $NP MPI ranks ---"
+        srun -n "$NP" --gpus-per-task=1 \
+            lmp -k on g $NP -sf kk -pk kokkos gpu/aware on \
+            -in in.benchmark_cascade -log "benchmark_${NP}ranks.log"
+    done
+    exit 0
+fi
+
+# ---- Production run ----
+srun --mpi=pmix -n "$TOTAL_GPUS" --gpus-per-task=1 \
+    lmp -k on g "$TOTAL_GPUS" -sf kk -pk kokkos gpu/aware on neigh full newton on \
+    -in in.cascade_production \
+    -var seed "$RANDOM" \
+    -var dump_dir dumps \
+    -log lammps_production.log
+
+# ---- Verify completion ----
+if grep -q "Total wall time" lammps_production.log; then
+    echo "LAMMPS run completed successfully"
+else
+    echo "[ERROR] LAMMPS did not report normal completion" >&2
+    tail -n 40 lammps_production.log
+    exit 1
+fi
+
+# ---- Compress large dump files for archival ----
+echo "Compressing trajectory dumps"
+tar -czf "dumps_${SLURM_JOB_ID}.tar.gz" dumps/
+echo "=== Job finished: $(date) ==="

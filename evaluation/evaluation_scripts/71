@@ -1,0 +1,73 @@
+#!/bin/bash
+#SBATCH --job-name=abaqus_fea
+#SBATCH --partition=bigmem
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=18
+#SBATCH --mem=500G
+#SBATCH --time=36:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# Abaqus/Standard implicit nonlinear structural FE analysis
+# (e.g. large-deformation contact simulation) using the
+# distributed-memory direct sparse solver. Monitors the .sta
+# file for increment convergence and automatically resumes
+# from the last completed increment on failure/timeout.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load abaqus/2024
+module load intel-mpi/2021.10
+
+CASE_DIR="/projects/myuser/abaqus/bracket_fatigue"
+cd "$CASE_DIR"
+
+JOB_NAME="bracket_contact_nl"
+TOTAL_CPUS=$((SLURM_NNODES * SLURM_NTASKS_PER_NODE))
+
+echo "=== Abaqus job: $TOTAL_CPUS CPUs across $SLURM_NNODES nodes ==="
+
+# ---- Write MP host file for Abaqus distributed-memory parallel ----
+scontrol show hostnames "$SLURM_JOB_NODELIST" > abaqus_hosts.txt
+
+# ---- Resume from restart if a previous .sta shows incomplete analysis ----
+RESTART_FLAG=""
+if [ -f "${JOB_NAME}.sta" ] && ! grep -q "THE ANALYSIS HAS COMPLETED SUCCESSFULLY" "${JOB_NAME}.sta"; then
+    echo "Previous run incomplete - resuming from restart"
+    RESTART_FLAG="oldjob=${JOB_NAME}"
+    cp "${JOB_NAME}.inp" "${JOB_NAME}_restart.inp"
+fi
+
+# ---- Launch Abaqus (it manages its own MPI internally) ----
+abaqus job="${JOB_NAME}" \
+    input="${JOB_NAME}.inp" \
+    cpus="${TOTAL_CPUS}" \
+    mp_mode=mpi \
+    memory="450gb" \
+    scratch="/scratch/${USER}/${SLURM_JOB_ID}" \
+    ${RESTART_FLAG} \
+    interactive
+
+ABQ_STATUS=$?
+
+# ---- Check final analysis status ----
+if grep -q "THE ANALYSIS HAS COMPLETED SUCCESSFULLY" "${JOB_NAME}.sta"; then
+    echo "Analysis completed successfully"
+else
+    echo "[WARN] Analysis did not report full completion - check .sta/.msg files"
+    tail -n 40 "${JOB_NAME}.sta"
+    if [ $ABQ_STATUS -ne 0 ]; then
+        echo "Resubmitting to continue from restart"
+        sbatch "$0"
+        exit 0
+    fi
+fi
+
+# ---- Extract summary results (max stress/displacement) via abaqus python ----
+abaqus python extract_results.py -- --odb "${JOB_NAME}.odb" --output summary_results.csv
+
+echo "=== Job finished: $(date) ==="

@@ -1,0 +1,71 @@
+#!/bin/bash
+#SBATCH --job-name=openfoam_cfd
+#SBATCH --partition=compute
+#SBATCH --nodes=6
+#SBATCH --ntasks-per-node=32
+#SBATCH --time=30:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# OpenFOAM incompressible turbulent flow (e.g. simpleFoam /
+# pimpleFoam) with full decompose -> parallel solve ->
+# reconstruct workflow, plus mesh-quality pre-check.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load openmpi/4.1.5
+module load openfoam/v2312
+
+CASE_DIR="/projects/myuser/openfoam/airfoil_case"
+cd "$CASE_DIR"
+source "${WM_PROJECT_DIR}/etc/bashrc"
+
+NTOTAL=$((SLURM_NNODES * SLURM_NTASKS_PER_NODE))
+echo "=== OpenFOAM case: $NTOTAL total ranks ==="
+
+# ---- Update decomposeParDict to match allocated core count ----
+sed -i "s/numberOfSubdomains.*/numberOfSubdomains ${NTOTAL};/" system/decomposeParDict
+
+# ---- Mesh generation (if not already present) ----
+if [ ! -d constant/polyMesh ] || [ -z "$(ls -A constant/polyMesh 2>/dev/null)" ]; then
+    echo "Generating mesh with blockMesh + snappyHexMesh"
+    blockMesh > logs/blockMesh.log 2>&1
+    decomposePar > logs/decomposePar_mesh.log 2>&1
+    srun --mpi=pmix -n "$NTOTAL" snappyHexMesh -parallel -overwrite > logs/snappyHexMesh.log 2>&1
+    reconstructParMesh -constant > logs/reconstructParMesh.log 2>&1
+fi
+
+# ---- Mesh quality check ----
+echo "Checking mesh quality"
+checkMesh > logs/checkMesh.log 2>&1
+if grep -q "Failed" logs/checkMesh.log; then
+    echo "[WARN] checkMesh reported failed checks - review logs/checkMesh.log"
+fi
+
+# ---- Decompose for the solver run (in case mesh was pre-existing) ----
+decomposePar -force > logs/decomposePar_solve.log 2>&1
+
+# ---- Run solver in parallel ----
+SOLVER="simpleFoam"
+echo "Running $SOLVER on $NTOTAL ranks"
+srun --mpi=pmix -n "$NTOTAL" "$SOLVER" -parallel > logs/${SOLVER}.log 2>&1
+
+# ---- Check convergence ----
+if grep -q "SIMPLE solution converged" "logs/${SOLVER}.log"; then
+    echo "Solver converged"
+else
+    echo "[WARN] Solver did not report explicit convergence - check residuals"
+fi
+
+# ---- Reconstruct parallel results ----
+echo "Reconstructing case"
+reconstructPar -latestTime > logs/reconstructPar.log 2>&1
+
+# ---- Post-process: forces/coefficients ----
+postProcess -func 'forceCoeffs' -latestTime > logs/forceCoeffs.log 2>&1
+
+echo "=== OpenFOAM job finished: $(date) ==="

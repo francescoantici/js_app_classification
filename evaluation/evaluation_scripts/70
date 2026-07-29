@@ -1,0 +1,78 @@
+#!/bin/bash
+#SBATCH --job-name=cesm_coupled
+#SBATCH --partition=compute
+#SBATCH --nodes=20
+#SBATCH --ntasks-per-node=36
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# CESM (Community Earth System Model) coupled run: atmosphere,
+# ocean, land, and sea-ice components run concurrently on
+# disjoint processor sets via the CPL7 coupler. Chains model
+# years until the target simulation length is reached, with
+# per-component restart-file verification.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load intel/2023.2
+module load intel-mpi/2021.10
+module load netcdf/4.9.2-mpi
+module load esmf/8.6.0
+
+CASE_DIR="/projects/myuser/cesm/cases/b.e21.BHIST.f09_g17.piControl"
+cd "$CASE_DIR"
+
+TARGET_YEARS=100
+YEARS_PER_SEGMENT=5
+
+echo "=== CESM coupled run segment: $(date) ==="
+
+# ---- Check current model year from the coupler restart pointer ----
+if [ -f rpointer.cpl ]; then
+    CURRENT_YEAR=$(cat rpointer.cpl | grep -oP '\.\K[0-9]{4}(?=-)' | head -n1)
+    echo "Resuming from model year: $CURRENT_YEAR"
+    ./xmlchange CONTINUE_RUN=TRUE
+else
+    CURRENT_YEAR=0
+    echo "Starting fresh from initial conditions"
+    ./xmlchange CONTINUE_RUN=FALSE
+fi
+
+# ---- Configure this segment's run length ----
+./xmlchange STOP_OPTION=nyears
+./xmlchange STOP_N=${YEARS_PER_SEGMENT}
+./xmlchange REST_OPTION=nyears
+./xmlchange REST_N=${YEARS_PER_SEGMENT}
+
+# ---- Submit via CESM's own case.submit (wraps srun internally) ----
+./case.submit --no-batch
+
+# ---- Verify all component restart files were written ----
+for COMP in cpl atm lnd ocn ice glc; do
+    if ! ls "${CASE_DIR}/run/"*.${COMP}.r.*.nc >/dev/null 2>&1; then
+        echo "[ERROR] Missing restart file for component: $COMP" >&2
+        exit 1
+    fi
+done
+echo "All component restarts verified."
+
+NEW_YEAR=$((CURRENT_YEAR + YEARS_PER_SEGMENT))
+echo "Completed through model year $NEW_YEAR"
+
+# ---- Chain next segment or finish ----
+if [ "$NEW_YEAR" -lt "$TARGET_YEARS" ]; then
+    echo "Resubmitting for next ${YEARS_PER_SEGMENT}-year segment"
+    sbatch "$0"
+else
+    echo "Target simulation length reached ($TARGET_YEARS years)."
+    module load python/3.11 nco/5.1.9
+    python3 scripts/compute_climatology.py \
+        --history-dir run --output analysis/climatology_final.nc
+fi
+
+echo "=== Segment finished: $(date) ==="

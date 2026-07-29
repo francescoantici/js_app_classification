@@ -1,0 +1,65 @@
+#!/bin/bash
+#SBATCH --job-name=md_gromacs
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=64G
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+# ============================================================
+# GROMACS MD production run, chained across multiple 24h jobs
+# until a target total simulation time is reached. Each
+# segment resumes from the previous checkpoint (.cpt) and
+# self-resubmits if the target isn't met yet.
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+module purge
+module load cuda/12.2
+module load gromacs/2024.1-gpu
+
+TARGET_NS=500            # total nanoseconds desired
+SEGMENT_NS=50             # ns simulated per job segment (approx, wall-time bound)
+SYSTEM="protein_ligand"
+TPR="${SYSTEM}.tpr"
+CPT="${SYSTEM}.cpt"
+
+echo "=== MD segment starting at $(date) ==="
+
+if [ -f "$CPT" ]; then
+    echo "Resuming from checkpoint: $CPT"
+    gmx mdrun -deffnm "$SYSTEM" -cpi "$CPT" -maxh 23.5 \
+        -nb gpu -pme gpu -bonded gpu -update gpu \
+        -ntmpi 2 -ntomp 12
+else
+    echo "Starting fresh MD run from $TPR"
+    gmx mdrun -deffnm "$SYSTEM" -maxh 23.5 \
+        -nb gpu -pme gpu -bonded gpu -update gpu \
+        -ntmpi 2 -ntomp 12
+fi
+
+# ---- Check simulated time so far ----
+CURRENT_NS=$(gmx check -f "${SYSTEM}.xtc" 2>&1 | grep -oP 'Last frame\s+\K[0-9.]+' || echo "0")
+CURRENT_NS_INT=$(printf "%.0f" "$CURRENT_NS")
+
+echo "Simulated so far: ${CURRENT_NS_INT} ns / target ${TARGET_NS} ns"
+
+# ---- Resubmit if target not yet reached ----
+if [ "$CURRENT_NS_INT" -lt "$TARGET_NS" ]; then
+    echo "Target not reached, resubmitting next segment..."
+    sbatch "$0"
+else
+    echo "Target simulation time reached. Running final analysis."
+    module load python/3.11
+    python3 analyze_trajectory.py \
+        --xtc "${SYSTEM}.xtc" \
+        --tpr "$TPR" \
+        --output "analysis/${SYSTEM}_final_report.pdf"
+fi
+
+echo "=== MD segment finished at $(date) ==="

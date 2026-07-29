@@ -1,0 +1,77 @@
+#!/bin/bash
+# ============================================================
+# Driver script: Quantum ESPRESSO ground-state SCF followed by
+# density-functional perturbation theory (DFPT) phonon
+# calculation, submitted as two dependent SLURM jobs.
+# Run from login node: bash 12_qe_phonon_workflow.sh
+# ============================================================
+
+set -euo pipefail
+mkdir -p logs
+
+echo "=== Stage 1: SCF ground state ==="
+SCF_JOBID=$(sbatch --parsable \
+    --job-name=qe_scf \
+    --partition=compute \
+    --nodes=1 \
+    --ntasks-per-node=32 \
+    --time=04:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load quantum-espresso/7.3
+        srun --mpi=pmix pw.x -npool 4 -in scf.in > scf.out
+        grep -q "convergence has been achieved" scf.out || { echo "SCF did not converge"; exit 1; }
+    ')
+echo "SCF job submitted: $SCF_JOBID"
+
+echo "=== Stage 2: DFPT phonon calculation (depends on SCF) ==="
+PH_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${SCF_JOBID} \
+    --job-name=qe_phonon \
+    --partition=compute \
+    --nodes=4 \
+    --ntasks-per-node=32 \
+    --time=48:00:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        set -euo pipefail
+        module load quantum-espresso/7.3
+
+        # Resume from existing phonon restart files if present
+        if ls _ph0/*.recover >/dev/null 2>&1; then
+            echo "Resuming phonon run from recover files"
+        fi
+
+        srun --mpi=pmix ph.x -npool 8 -in phonon.in > phonon.out
+
+        if grep -q "PWSCF" phonon.out && ! grep -qi "error" phonon.out; then
+            echo "Phonon run appears complete"
+        else
+            echo "Phonon run incomplete or restart needed - resubmitting"
+            sbatch --dependency=afterany:$SLURM_JOB_ID "$0"
+        fi
+    ')
+echo "Phonon job submitted: $PH_JOBID (depends on afterok:${SCF_JOBID})"
+
+echo "=== Stage 3: post-process dynamical matrices into phonon DOS/dispersion ==="
+POST_JOBID=$(sbatch --parsable \
+    --dependency=afterok:${PH_JOBID} \
+    --job-name=qe_postproc \
+    --partition=compute \
+    --ntasks=1 \
+    --cpus-per-task=4 \
+    --mem=16G \
+    --time=00:30:00 \
+    --output=logs/%x_%j.out \
+    --error=logs/%x_%j.err \
+    --wrap='
+        module load quantum-espresso/7.3
+        q2r.x < q2r.in > q2r.out
+        matdyn.x < matdyn.in > matdyn.out
+        echo "Phonon dispersion/DOS generated"
+    ')
+echo "Post-processing submitted: $POST_JOBID"
+echo "Chain: $SCF_JOBID -> $PH_JOBID -> $POST_JOBID"
