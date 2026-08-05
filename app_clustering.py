@@ -11,6 +11,7 @@ Pipeline:
 
 import os
 import re
+import argparse
 import numpy as np
 import pandas as pd
 from sklearn.cluster import DBSCAN
@@ -33,22 +34,51 @@ def strip_label(text: str) -> str:
     return text
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="DBSCAN clustering on app labels")
 
     # Data config
-    INPUT_CSV    = "results/labels.csv"
-    OUTPUT_CSV   = "results/labels_clustered.csv"
-    LABEL_COLUMN = "app_label"
+    parser.add_argument("--input_csv", default="results/labels.csv",
+                        help="Input CSV file path (default: results/labels.csv)")
+    parser.add_argument("--output_csv", default="results/labels_clustered.csv",
+                        help="Output CSV file path (default: results/labels_clustered.csv)")
+    parser.add_argument("--label_column", default="app_label",
+                        help="Column name containing labels (default: app_label)")
 
     # Clustering config
-    MIN_CLUSTER_SIZE = 15
-    EPS = 0.01
-    METRIC = "cosine"
+    parser.add_argument("--min_cluster_size", type=int, default=15,
+                        help="Minimum cluster size for DBSCAN (default: 15)")
+    parser.add_argument("--eps", type=float, default=0.01,
+                        help="EPS parameter for DBSCAN (default: 0.01)")
+    parser.add_argument("--metric", default="cosine",
+                        help="Distance metric for DBSCAN (default: cosine)")
 
     # Embedding config
-    EMBEDDING_MODEL="google/embeddinggemma-300m" 
-    TRUNCATE_DIM = 256
-    BATCH_SIZE  = 64    # number of labels encoded per forward pass
-    DEVICE      = None  # None → auto-detect (cuda if available, else cpu)
+    parser.add_argument("--embedding_model", default="google/embeddinggemma-300m",
+                        help="Sentence transformer model for embeddings (default: google/embeddinggemma-300m)")
+    parser.add_argument("--truncate_dim", type=int, default=256,
+                        help="Dimension to truncate embeddings (default: 256)")
+    parser.add_argument("--batch_size", type=int, default=64,
+                        help="Batch size for embedding (default: 64)")
+    parser.add_argument("--device", default=None,
+                        help="Device for embedding (default: auto-detect)")
+
+    args = parser.parse_args()
+
+    # Data config
+    INPUT_CSV    = args.input_csv
+    OUTPUT_CSV   = args.output_csv
+    LABEL_COLUMN = args.label_column
+
+    # Clustering config
+    MIN_CLUSTER_SIZE = args.min_cluster_size
+    EPS = args.eps
+    METRIC = args.metric
+
+    # Embedding config
+    EMBEDDING_MODEL=args.embedding_model
+    TRUNCATE_DIM = args.truncate_dim
+    BATCH_SIZE  = args.batch_size
+    DEVICE      = args.device
 
     # LOAD DATA
     print(f"Loading data from '{INPUT_CSV}' ...")
@@ -81,7 +111,7 @@ if __name__ == "__main__":
     print(f"  Labels ready for embedding      : {len(df)}")
 
     # Extract app names
-    app_names = df[LABEL_COLUMN].unique()
+    app_names = df[LABEL_COLUMN].unique().to_numpy()
     print(f"Found {len(app_names)} unique app names")
 
     # EMBED WITH embedding-emma
@@ -104,7 +134,7 @@ if __name__ == "__main__":
     # DBSCAN CLUSTERING
     print(f"\nRunning DBSCAN (eps={EPS}, min_samples={MIN_CLUSTER_SIZE}) ...")
     # Save weights to make the operations less memory intensive
-    sample_weight = [len(df[df.cluster_name == app]) for app in app_names]
+    sample_weight = [len(df[df[LABEL_COLUMN] == app]) for app in app_names]
 
     # Cluster
     db = DBSCAN(eps=EPS, min_samples=MIN_CLUSTER_SIZE, metric="cosine", n_jobs=-1)

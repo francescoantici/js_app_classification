@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
-import os 
+import os
 import time
+import argparse
 import multiprocessing as mp
 
 from clients.llm_client import LLMClient
@@ -9,7 +10,27 @@ from dtos.llm_request import ScriptCharacterizerLLMRequest
 from dtos.llm_response import ScriptCharacterizerLLMResponse
 
 if __name__ == "__main__":
-    # Load dotenv 
+    parser = argparse.ArgumentParser(description="Extract app labels from scripts using LLM")
+
+    # System prompt path
+    parser.add_argument("--system_prompt", default="prompts/system_prompt.txt",
+                        help="Path to system prompt file (default: prompts/system_prompt.txt)")
+
+    # Label output file
+    parser.add_argument("--label_file", default="results/labels.csv",
+                        help="Output CSV file for labels (default: results/labels.csv)")
+
+    # LLM config - keep as env vars by default, but allow override
+    parser.add_argument("--endpoint", default=None,
+                        help="LLM endpoint URL (default: LOADS FROM ENDPOINT env var)")
+    parser.add_argument("--api_key", default=None,
+                        help="API key for LLM (default: LOADS FROM API_KEY env var)")
+    parser.add_argument("--model", default=None,
+                        help="Model name (default: LOADS FROM MODEL env var)")
+
+    args = parser.parse_args()
+
+    # Load dotenv
     load_dotenv(".env")
 
     # Load scripts 
@@ -17,15 +38,23 @@ if __name__ == "__main__":
     # Parse scripts
     scripts = [Script(jid=i, body=script, job_directives_keyword="SBATCH") for i, script in enumerate(raw_scripts)]
 
-    # System prompt path 
-    system_prompt = open("prompts/system_prompt.txt").read()
-            
+    # System prompt path
+    system_prompt_path = args.system_prompt
+    if not os.path.exists(system_prompt_path):
+        raise FileNotFoundError(f"System prompt file not found: {system_prompt_path}")
+    system_prompt = open(system_prompt_path).read()
+
     # Define output file
-    label_file = f"results/labels.csv"
+    label_file = args.label_file
+
+    # Initialize the llm client
+    endpoint = args.endpoint if args.endpoint else os.getenv("ENDPOINT")
+    api_key = args.api_key if args.api_key else os.getenv("API_KEY")
+    model = args.model if args.model else os.getenv("MODEL")
                 
     def characterize_job(script:str):
-        # Initialize the llm client
-        llm_client = LLMClient(endpoint=os.getenv("ENDPOINT"), api_key=os.getenv("API_KEY"), model = os.getenv("MODEL"))
+
+        llm_client = LLMClient(endpoint=endpoint, api_key=api_key, model=model)
         if not(script):
             print(f"The script cannot be empty or none")
             return None

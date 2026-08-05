@@ -1,0 +1,99 @@
+jid,path,application,inf_time
+1,scripts/01,vasp,0.5097148418426514
+2,scripts/02,gromacs,0.3078160285949707
+3,scripts/03,distributed training,0.3822519779205322
+4,scripts/04,structural biology,0.2952580451965332
+5,scripts/05,lammps,0.29136061668395996
+6,scripts/06,chemistry simulation,0.3429131507873535
+7,scripts/07,nwp,0.33391904830932617
+8,scripts/08,modylas,0.36202096939086914
+9,scripts/09,rsync,0.35907673835754395
+10,scripts/10,openfoam,0.36374711990356445
+11,scripts/11,cosmoflow,0.38470888137817383
+12,scripts/12,spark,0.26590514183044434
+13,scripts/13,finite element analysis,0.3311140537261963
+14,scripts/14,chemistry simulation,0.31121826171875
+15,scripts/15,gpt3_deepspeed,0.43836498260498047
+16,scripts/16,abinit,0.2884361743927002
+17,scripts/17,vasp,0.29151487350463867
+18,scripts/18,nwp,0.28762316703796387
+19,scripts/19,imagenet training,0.34111523628234863
+20,scripts/20,molecular dynamics,0.37543201446533203
+21,scripts/21,molecular dynamics,0.3762989044189453
+22,scripts/22,metagenomics,0.4731621742248535
+23,scripts/23,physics simulation,0.34886884689331055
+24,scripts/24,snakemake,0.36364102363586426
+25,scripts/25,financial analysis,0.30571699142456055
+26,scripts/26,nwp,0.33545994758605957
+27,scripts/27,demo,0.3154890537261963
+28,scripts/28,molecular dynamics,0.3244302272796631
+29,scripts/29,video processing,0.3443310260772705
+30,scripts/30,chemistry simulation,0.29331302642822266
+31,scripts/31,image reconstruction,0.34717535972595215
+32,scripts/32,structural biology,1.306767225265503
+33,scripts/33,astronomy data processing,0.39577293395996094
+34,scripts/34,quantum chromodynamics,0.38948726654052734
+35,scripts/35,image reconstruction,0.34717702865600586
+36,scripts/36,heat equation,0.3429281711578369
+37,scripts/37,machine learning,0.3516089916229248
+38,scripts/38,chemistry simulation,0.3557710647583008
+39,scripts/39,nwp,0.2913498878479004
+40,scripts/40,structural biology,0.34876489639282227
+41,scripts/41,openfoam,0.36319994926452637
+42,scripts/42,specfem3d,0.4154231548309326
+43,scripts/43,chemistry simulation,0.29939699172973633
+44,scripts/44,chemistry simulation,0.30354785919189453
+45,scripts/45,structural biology,0.30386805534362793
+46,scripts/46,nwp,0.2927401065826416
+47,scripts/47,data transfer,0.34083127975463867
+48,scripts/48,dreambooth,0.2899589538574219
+49,scripts/49,openfoam,0.39815783500671387
+50,scripts/50,structural biology,0.3059260845184326
+51,scripts/51,openfoam,0.5371639728546143
+52,scripts/52,deep learning training,0.29155611991882324
+53,scripts/53,chemistry simulation,0.3022501468658447
+54,scripts/54,structural biology,0.3067479133605957
+55,scripts/55,openfoam,0.3636291027069092
+56,scripts/56,horovod,0.3374028205871582
+57,scripts/57,salmon,0.29224419593811035
+58,scripts/58,gromacs,0.37158203125
+59,scripts/59,machine learning pipeline,0.45447778701782227
+60,scripts/60,vasp,0.28594303131103516
+61,scripts/61,phonon,0.2900090217590332
+62,scripts/62,chemistry simulation,0.2967832088470459
+63,scripts/63,nwp,0.29041099548339844
+64,scripts/64,cosmoflow,0.3851618766784668
+65,scripts/65,lammps,0.28992772102355957
+66,scripts/66,openfoam,0.36661219596862793
+67,scripts/67,nuclear simulation,0.45382118225097656
+68,scripts/68,seismic inversion,0.33219480514526367
+70,scripts/70,nwp,0.2932770252227783
+71,scripts/71,ls-dyna,0.3598599433898926
+72,scripts/72,photonic simulation,0.32765889167785645
+73,scripts/73,slepc eigensolver,0.36102819442749023
+74,scripts/74,density,0.2650761604309082
+75,scripts/75,nuclear simulation,0.3282930850982666
+76,scripts/76,genomics,0.2914309501647949
+77,scripts/77,relion,0.2925581932067871
+78,scripts/78,chemistry simulation,0.30141282081604004
+79,scripts/79,physics simulation,0.3073139190673828
+80,scripts/80,cp2k,0.3201327323913574
+81,scripts/81,pic,0.27041101455688477
+82,scripts/82,nuclear simulation,0.37627410888671875
+83,scripts/83,ocean modeling,0.3187520503997803
+84,scripts/84,cosmoflow,0.3415796756744385
+85,scripts/85,chemistry simulation,0.3020179271697998
+86,scripts/86,nwp,0.338897705078125
+87,scripts/87,abinit,0.3426980972290039
+88,scripts/88,nuclear simulation,0.37346982955932617
+89,scripts/89,SCALE-LETKF,0.4127318859100342
+90,scripts/90,nuclear simulation,0.3285391330718994
+91,scripts/91,phase,0.26163411140441895
+92,scripts/92,ice sheet modeling,0.37670087814331055
+93,scripts/93,accelerator physics,0.37586379051208496
+94,scripts/94,openfoam,0.3911919593811035
+95,scripts/95,material science,0.3520350456237793
+96,scripts/96,radio astronomy,0.34357404708862305
+97,scripts/97,vasp,0.29903602600097656
+99,scripts/99,neural simulation,0.3387770652770996
+100,scripts/100,chemistry simulation,0.6943919658660889

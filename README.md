@@ -4,6 +4,7 @@ This repo contains the code to execute application classification of job scripts
 
 **Repository Structure**
 - **app_extraction.py:** Example to run the extraction/classification workflow. To be filled with the needed data.
+- **app_clustering.py:** DBSCAN clustering script for grouping similar app labels.
 - **requirements.txt:** Python dependencies required to run the project.
 - **clients/**: Contains client wrappers used to call external services.
 	- **llm_client.py:** Lightweight wrapper around the LLM OpenAI API used for sending requests and receiving responses.
@@ -17,21 +18,80 @@ This repo contains the code to execute application classification of job scripts
 	- **system_prompt.txt:** System-level instructions used when querying the LLM.
 - **evaluation/**: Contains the evaluation scripts and results for a series of models.
 
-**How to run (local, minimal)**
-- **Install dependencies:**
+## app_extraction.py - LLM-based Application Extraction
 
-	```
-	python3 -m venv .venv
-	source .venv/bin/activate
-	pip install -r requirements.txt
-	```
+Extracts application labels from job scripts using an LLM.
 
-Add API keys and configuration to `.env` file before running (not checked into repo). To add new prompt templates, create files under `prompts/` and reference them from `clients/llm_client.py` or the model logic. Make sure to modify the `app_extraction.py` file to load the needed raw job script dataset. If needed, the file `script.py` should be configured, or extended by a new class, to describe the job script structure of the target dataset.
+**Required setup:**
+- Add API keys and configuration to `.env` file:
+  ```
+  ENDPOINT=https://your-endpoint.com/v1
+  API_KEY=your-api-key
+  MODEL=your-model-name
+  ```
 
-- **Run extraction:**
+**Usage:**
+```bash
+python app_extraction.py [OPTIONS]
+```
 
-	```
-	python app_extraction.py
-	```
+**Options:**
 
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--system_prompt` | `prompts/system_prompt.txt` | Path to system prompt file |
+| `--label_file` | `results/labels.csv` | Output CSV file for labels |
+| `--endpoint` | env variable | LLM endpoint URL (overrides `.env`) |
+| `--api_key` | env variable | API key for LLM (overrides `.env`) |
+| `--model` | env variable | Model name (overrides `.env`) |
+
+**Example:**
+```bash
+python app_extraction.py --system_prompt prompts/custom_prompt.txt --label_file results/output.csv
+```
+
+## app_clustering.py - DBSCAN Clustering
+
+Clusters similar app labels using embedding vectors and DBSCAN.
+
+**Output from `app_extraction.py` (labels.csv) is required as input.**
+
+**Usage:**
+```bash
+python app_clustering.py [OPTIONS]
+```
+
+**Options:**
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--input_csv` | `results/labels.csv` | Input CSV file with app labels |
+| `--output_csv` | `results/labels_clustered.csv` | Output clustered CSV file |
+| `--label_column` | `app_label` | Column name containing labels to cluster |
+| `--min_cluster_size` | `15` | Minimum number of samples in a cluster (DBSCAN min_samples) |
+| `--eps` | `0.01` | Maximum distance between samples in the same cluster (DBSCAN eps) |
+| `--metric` | `cosine` | Distance metric for DBSCAN |
+| `--embedding_model` | `google/embeddinggemma-300m` | Sentence-transformers model for embeddings |
+| `--truncate_dim` | `256` | Dimension to truncate embeddings |
+| `--batch_size` | `64` | Batch size for embedding inference |
+| `--device` | auto-detect | Device for embedding (e.g., cpu, cuda) |
+
+**Example:**
+```bash
+python app_clustering.py --eps 0.05 --min_cluster_size 10
+```
+
+## Full Workflow
+
+1. **Extract** application labels from scripts:
+   ```bash
+   python app_extraction.py
+   ```
+
+2. **Cluster** the extracted labels:
+   ```bash
+   python app_clustering.py
+   ```
+
+3. Results are saved to `results/labels.csv` (extraction) and `results/labels_clustered.csv` (clustering).
 

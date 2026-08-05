@@ -1,0 +1,101 @@
+id,application,cluster
+1,vasp,0
+2,gromacs,1
+3,train resnet,2
+4,nextflow,3
+5,lammps,4
+6,finetune bert,5
+7,climate analysis,6
+8,snakemake,7
+9,rsync,8
+10,openfoam,9
+11,transformer train jax,10
+12,threat detection spark,11
+13,finite element analysis,12
+14,gaussian,13
+15,deepspeed gpt3 train,14
+16,quantum espresso,15
+17,vasp gpu,16
+18,cylc,17
+19,horovodrun,18
+20,amber,19
+21,namd,20
+22,nextflow,3
+23,process events,21
+24,snakemake,7
+25,analyze market data,22
+26,climate,23
+27,eda analysis,24
+28,opennm,25
+29,ffmpeg,26
+30,cp2k,27
+31,process satellite dask,28
+32,nextflow,3
+33,process night,29
+34,lattice cfd,30
+35,segmentation inference,31
+36,octave,32
+37,xgboost training,33
+38,train gnn,34
+39,cylc,17
+40,nextflow,3
+41,cleanup cfd,35
+42,specfem3d setup,36
+43,train esm mpi,37
+44,orca,38
+45,blast+,39
+46,wrf,40
+47,abyss,41
+48,stable diffusion,42
+49,su2 cfd,43
+50,bioinformatics setup,44
+51,mpi simulation,45
+52,imagenet training,46
+53,montecarlo,47
+54,genomics,48
+55,cfd simulation,49
+56,train transformers,50
+57,rnaseq,51
+58,gromacs md,52
+59,score model,53
+60,vasp,0
+61,phonon,54
+62,nwchem ccsd,55
+63,wrf,40
+64,gadget,56
+65,lammps md,57
+66,openfoam cfd,58
+67,lattice qcd,59
+68,seismic fwi,60
+69,alphafold,61
+70,cesm,62
+71,abaqus,63
+72,fdtd,64
+73,hamiltonian,65
+74,dns fftw,66
+75,flash amr,67
+76,genome assembly busco,68
+77,cryo-em,69
+78,vqe,70
+79,geant4,71
+80,cp2k ab-initio dft,72
+81,pic plasma,73
+82,openmc,74
+83,mom6,75
+84,nyx hydro,76
+85,combustion dns,77
+86,geoclaw,78
+87,gw,79
+88,pycbc,80
+89,enkf,81
+90,cactus,82
+91,phase field,83
+92,pism ice,84
+93,opal lattice,85
+94,airfoil su2,86
+95,thermal structural model,87
+96,dedispersed radio astronomy,88
+97,dft relaxation,89
+98,ml interatomic potential,90
+99,nest,91
+100,saxs,92

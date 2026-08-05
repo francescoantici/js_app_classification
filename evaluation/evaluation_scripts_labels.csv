@@ -32,7 +32,7 @@ id,application
 31,process satellite dask
 32,nextflow
 33,process night
-34,lattice cfd
+34,lattice QCD
 35,segmentation inference
 36,octave
 37,xgboost training
