@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: slurm
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: pycbc
+  target_executable: pycbc_inspiral
+  workload_category: simulation_modeling
+compute_profile: []

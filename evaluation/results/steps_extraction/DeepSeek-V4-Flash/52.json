@@ -1,0 +1,179 @@
+{
+    "description": "Deep learning training job with SLURM, using torchrun for distributed training, checkpointing, and automatic requeue on time limit",
+    "domain": [
+        "ai"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs checkpoints",
+                    "CHECKPOINT_DIR=\"./checkpoints/${SLURM_JOB_NAME}\"",
+                    "mkdir -p \"$CHECKPOINT_DIR\""
+                ],
+                "step_description": "Set up logging and checkpoint directories"
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load cuda/12.2",
+                    "module load cudnn/8.9",
+                    "module load anaconda3/2024.02",
+                    "source activate dl_env"
+                ],
+                "step_description": "Load required modules and activate deep learning environment"
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": "null"
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "nvidia-smi --query-gpu=index,name,memory.total,memory.used --format=csv"
+                ],
+                "step_description": "Display GPU information"
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "trap requeue_handler USR1",
+                    "MAX_RESTARTS=10",
+                    "RESTART_COUNT=$(scontrol show job \"$SLURM_JOB_ID\" | grep -oP 'Restarts=\\K[0-9]+' || echo 0)",
+                    "echo \"Restart count: $RESTART_COUNT\""
+                ],
+                "step_description": "Set up signal handling for graceful stop and requeue"
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "LATEST_CKPT=$(ls -t \"${CHECKPOINT_DIR}\"/*.ckpt 2>/dev/null | head -n1 || true)",
+                    "RESUME_ARG=\"\"",
+                    "if [ -n \"$LATEST_CKPT\" ]; then",
+                    "  echo \"Resuming from checkpoint: $LATEST_CKPT\"",
+                    "  RESUME_ARG=\"--resume-from ${LATEST_CKPT}\"",
+                    "fi"
+                ],
+                "step_description": "Determine latest checkpoint and set resume argument"
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train.py",
+                "parameters": [
+                    "torchrun",
+                    "--nproc_per_node=4",
+                    "--nnodes=1",
+                    "train.py",
+                    "--data-dir /projects/myuser/datasets/imagenet",
+                    "--batch-size 256",
+                    "--epochs 200",
+                    "--lr 0.1",
+                    "--checkpoint-dir \"$CHECKPOINT_DIR\"",
+                    "--checkpoint-every-epoch",
+                    "--resume-from ${LATEST_CKPT}"
+                ],
+                "step_description": "Launch distributed training with torchrun using checkpointing"
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "wait $!",
+                    "TRAIN_STATUS=$?",
+                    "if [ $TRAIN_STATUS -eq 0 ]; then",
+                    "  echo \"Training completed successfully at $(date)\"",
+                    "else",
+                    "  echo \"[WARN] Training process exited with status $TRAIN_STATUS\"",
+                    "fi",
+                    "exit $TRAIN_STATUS"
+                ],
+                "step_description": "Wait for training to finish, report status, and exit with training status"
+            }
+        }
+    ]
+}

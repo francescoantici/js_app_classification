@@ -1,0 +1,30 @@
+{
+    "description": "Run an NWChem CCSD(T) quantum chemistry calculation on a molecule with a large memory allocation, using local scratch space for temporary files.",
+    "domain": [
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "NWChem",
+                "executed_file": null,
+                "parameters": [
+                    "ccsdt.nw",
+                    "> ccsdt.out",
+                    "2>&1"
+                ],
+                "step_description": "Run NWChem with the generated input file using srun, then check for successful completion by grepping the output."
+            }
+        }
+    ]
+}

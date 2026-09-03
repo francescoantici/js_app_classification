@@ -1,0 +1,146 @@
+{
+    "description": "Run an OpenMC reactor criticality calculation on a PWR assembly, with source convergence check and optional resubmission.",
+    "domain": [
+        "physics",
+        "nuclear engineering"
+    ],
+    "steps": [
+        {
+            "step_id": 0,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs statepoints",
+                    "module purge",
+                    "module load openmpi/4.1.5",
+                    "module load openmc/0.14.0",
+                    "module load hdf5/1.14.0-mpi",
+                    "CASE_DIR=\"/projects/myuser/reactor_physics/pwr_assembly\"",
+                    "cd \"$CASE_DIR\"",
+                    "echo \"=== OpenMC reactor criticality calculation: $(date) ===\"",
+                    "echo \"Ranks: $SLURM_NTASKS\""
+                ],
+                "step_description": "Prepare the working directory, load required modules, and print job information."
+            }
+        },
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [
+                    "import openmc",
+                    "settings = openmc.Settings.from_xml('settings.xml')",
+                    "settings.particles = 1_000_000",
+                    "settings.batches = 200",
+                    "settings.inactive = 50",
+                    "settings.output = {'summary': True}",
+                    "settings.export_to_xml()"
+                ],
+                "step_description": "Modify OpenMC settings (particles, batches, inactive) and export updated settings.xml."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "OpenMC",
+                "executed_file": null,
+                "parameters": [
+                    "--mpi=pmix",
+                    "--threads=1"
+                ],
+                "step_description": "Run the OpenMC criticality simulation with MPI."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [
+                    "import openmc",
+                    "import glob",
+                    "sp_files = sorted(glob.glob('statepoint.*.h5'))",
+                    "sp = openmc.StatePoint(sp_files[-1])",
+                    "entropy = sp.entropy",
+                    "k_eff = sp.k_combined",
+                    "print(f\"k-effective: {k_eff.n:.5f} +/- {k_eff.s:.5f}\")",
+                    "import numpy as np",
+                    "tail = entropy[-20:]",
+                    "converged = np.std(tail) < 0.01",
+                    "print(f\"Shannon entropy converged: {converged}\")",
+                    "with open('convergence_status.txt', 'w') as f:",
+                    "f.write('CONVERGED' if converged else 'NOT_CONVERGED')"
+                ],
+                "step_description": "Analyze the last statepoint file to compute k-effective and check Shannon entropy convergence, writing status to file."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "STATUS=$(cat convergence_status.txt)",
+                    "if [ \"$STATUS\" = \"NOT_CONVERGED\" ]; then",
+                    "echo \"[WARN] Source distribution not fully converged - consider extending batches\"",
+                    "echo \"Resubmitting with additional active batches\"",
+                    "sed -i 's/settings.batches = 200/settings.batches = 300/' /dev/null 2>/dev/null || true",
+                    "sbatch --export=EXTEND_BATCHES=1 \"$0\"",
+                    "else",
+                    "echo \"Criticality calculation converged.\"",
+                    "mv statepoint.*.h5 statepoints/",
+                    "fi",
+                    "echo \"=== Job finished: $(date) ===\""
+                ],
+                "step_description": "Check convergence status; if not converged, resubmit the job with extended batches; otherwise move statepoint files to statepoints directory and print completion message."
+            }
+        }
+    ]
+}

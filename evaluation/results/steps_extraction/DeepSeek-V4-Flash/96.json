@@ -1,0 +1,178 @@
+{
+    "description": "Pulsar search using PRESTO, processing a filterbank file across a range of dispersion measure (DM) trials. The job initializes a DM trial table, then for each array task de-disperses, performs FFT, acceleration search, and single pulse search, copying output candidates.",
+    "domain": "astronomy",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load presto/5.0.3",
+                    "module load python/3.11"
+                ],
+                "step_description": "Set up environment by purging and loading required modules (PRESTO and Python)."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "parse_ddplan_to_trials.py",
+                "parameters": [
+                    "--ddplan-file ddplan_output.txt",
+                    "--output dm_trials.tsv"
+                ],
+                "step_description": "Generate the DM trial table by running DDplan.py and parsing its output into a tab-separated file."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "sleep 2",
+                    "sed -n \"${LINE}p\" \"$DM_TABLE\""
+                ],
+                "step_description": "Wait for the DM table to be available and read the DM value for the current task ID."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "prepsubband",
+                "executed_file": null,
+                "parameters": [
+                    "-o \"dedispersed/beam03_DM${DM}\"",
+                    "-dm \"$DM\"",
+                    "-numdms 1",
+                    "-nsub 128",
+                    "-downsamp 1",
+                    "\"$RAW_DATA\""
+                ],
+                "step_description": "De-disperse the raw filterbank data for the current DM trial using prepsubband."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "realfft",
+                "executed_file": null,
+                "parameters": [
+                    "\"dedispersed/beam03_DM${DM}.dat\""
+                ],
+                "step_description": "Perform a real FFT on the de-dispersed time series."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "accelsearch",
+                "executed_file": null,
+                "parameters": [
+                    "-zmax 200",
+                    "-numharm 8",
+                    "\"dedispersed/beam03_DM${DM}.fft\""
+                ],
+                "step_description": "Run acceleration search to detect periodic signals in the FFT data."
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "single_pulse_search.py",
+                "executed_file": null,
+                "parameters": [
+                    "\"dedispersed/beam03_DM${DM}.dat\""
+                ],
+                "step_description": "Run single pulse search on the de-dispersed data."
+            }
+        },
+        {
+            "step_id": 8,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "cp \"dedispersed/beam03_DM${DM}_ACCEL_\"* candidates/",
+                    "cp \"dedispersed/beam03_DM${DM}\"*.singlepulse candidates/"
+                ],
+                "step_description": "Copy generated candidate files (ACCEL and singlepulse) to the candidates directory."
+            }
+        }
+    ]
+}

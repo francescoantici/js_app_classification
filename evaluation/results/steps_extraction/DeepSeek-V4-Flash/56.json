@@ -1,0 +1,38 @@
+{
+    "description": "This job script configures a distributed TensorFlow training job using Horovod with NCCL and MPI across multiple GPU nodes. It sets up the environment, runs the PyTorch training script 'train_distributed.py' with distributed settings, and logs the training output.",
+    "domain": "ai",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_distributed.py",
+                "parameters": [
+                    "--data-dir",
+                    "/projects/myuser/datasets/large_corpus",
+                    "--model",
+                    "transformer_large",
+                    "--global-batch-size",
+                    "4096",
+                    "--epochs",
+                    "50",
+                    "--checkpoint-dir",
+                    "./checkpoints",
+                    "--log-dir",
+                    "./tb_logs",
+                    "--fp16"
+                ],
+                "step_description": "Runs the distributed training script 'train_distributed.py' using Horovod with MPI, setting up NCCL environment variables and executing with mpirun across multiple GPUs."
+            }
+        }
+    ]
+}

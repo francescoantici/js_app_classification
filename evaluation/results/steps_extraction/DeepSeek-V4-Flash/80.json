@@ -1,0 +1,52 @@
+{
+    "description": "This job script runs a CP2K AIMD simulation in segments, resuming from restart files until the target number of steps is reached, then performs analysis with a Python script.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "cp2k",
+                "executed_file": null,
+                "parameters": [
+                    "-i",
+                    "aimd_liquid_water.inp",
+                    "-o",
+                    "output_step0.log"
+                ],
+                "step_description": "Run CP2K AIMD simulation either fresh or resumed from a restart file, using MPI via srun."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_rdf_diffusion.py",
+                "parameters": [
+                    "--trajectory",
+                    "aimd_liquid_water-pos-1.xyz",
+                    "--output",
+                    "analysis/water_rdf_diffusion.json"
+                ],
+                "step_description": "Analyze radial distribution function and diffusion from the AIMD trajectory using a Python script."
+            }
+        }
+    ]
+}

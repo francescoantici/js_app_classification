@@ -1,0 +1,97 @@
+{
+    "description": "A four-stage ETL pipeline submitted as a chain of SLURM jobs: data ingestion/validation across shards, feature engineering, GPU-accelerated model scoring, and report generation with dependency handling.",
+    "domain": [
+        "data science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "ingest_validate.py",
+                "parameters": [
+                    "--shard-id $SLURM_ARRAY_TASK_ID",
+                    "--input data/raw/shard_${SLURM_ARRAY_TASK_ID}.parquet",
+                    "--output data/features/validated_${SLURM_ARRAY_TASK_ID}.parquet",
+                    "--schema schema.json"
+                ],
+                "step_description": "For each shard (array task), run Python script to ingest and validate raw data, producing validated parquet files."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "build_features.py",
+                "parameters": [
+                    "--input-dir data/features",
+                    "--output data/features/combined_features.parquet",
+                    "--n-jobs 32"
+                ],
+                "step_description": "Run feature engineering script to combine validated shards into a single feature set, using 32 parallel jobs."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "score_model.py",
+                "parameters": [
+                    "--features data/features/combined_features.parquet",
+                    "--model-path /projects/myuser/models/scorer_v3.pt",
+                    "--output data/scores/predictions.parquet",
+                    "--batch-size 8192"
+                ],
+                "step_description": "Run model scoring on a GPU node, using the combined features and a pre-trained model to output predictions."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "generate_report.py",
+                "parameters": [
+                    "--scores data/scores/predictions.parquet",
+                    "--output reports/pipeline_report_${JOB3}.html"
+                ],
+                "step_description": "Generate a report from the predictions, or a failure report if the scoring step did not complete successfully. The script checks the job state and adjusts accordingly."
+            }
+        }
+    ]
+}

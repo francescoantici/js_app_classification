@@ -1,0 +1,13 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: slurm
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: AlphaFold
+  target_executable: run_alphafold.py
+  workload_category: bioinformatics
+compute_profile:
+- mpi
+- openmp

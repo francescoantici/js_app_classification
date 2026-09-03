@@ -1,0 +1,149 @@
+{
+    "description": "Run a combustion DNS simulation with restart and resubmission until target flame time is reached, then analyze turbulent flame speed.",
+    "domain": [
+        "combustion",
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs plotfiles checkpoints",
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load openmpi/4.1.5",
+                    "module load hdf5/1.14.0-mpi",
+                    "module load sundials/6.7.0",
+                    "module load amrex/24.06",
+                    "cd /projects/myuser/combustion/premixed_h2_air_dns"
+                ],
+                "step_description": "Set up directories, load modules, and change to case directory."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "LATEST_CHK=$(ls -d checkpoints/chk[0-9]* 2>/dev/null | sort -V | tail -n1 || true)",
+                    "if [ -n \"$LATEST_CHK\" ]; then",
+                    "RESTART_LINE=\"amr.restart = ${LATEST_CHK}\"",
+                    "else",
+                    "RESTART_LINE=\"\"",
+                    "fi",
+                    "cat > inputs_segment <<EOF ... EOF"
+                ],
+                "step_description": "Detect latest checkpoint, generate inputs file with restart line or fresh start."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "PeleC3d",
+                "executed_file": "./PeleC3d.gnu.MPI.ex",
+                "parameters": [
+                    "inputs_segment",
+                    "srun --mpi=pmix"
+                ],
+                "step_description": "Run PeleC3d combustion DNS simulation using MPI with specified input file."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "extract_flame_time.py",
+                "parameters": [
+                    "--checkpoint $LATEST_CHK"
+                ],
+                "step_description": "Extract current flame time from latest checkpoint using Python script."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "if awk -v c=\"$CURRENT_FLAME_TIME\" -v t=\"$TARGET_FLAME_TIMES\" 'BEGIN{exit !(c < t)}'; then",
+                    "echo \"Target not reached - resubmitting next segment\"",
+                    "sbatch \"$0\"",
+                    "else",
+                    "echo \"Target flame-time duration reached.\"",
+                    "fi"
+                ],
+                "step_description": "Check if target flame time is reached; if not, resubmit job, else continue."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_turbulent_flame_speed.py",
+                "parameters": [
+                    "--plotfile-dir plotfiles",
+                    "--output analysis/flame_speed_statistics.json"
+                ],
+                "step_description": "Compute turbulent flame speed statistics from plotfiles using Python script."
+            }
+        }
+    ]
+}

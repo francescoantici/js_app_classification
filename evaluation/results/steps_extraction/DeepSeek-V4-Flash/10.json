@@ -1,0 +1,82 @@
+{
+    "description": "This job script performs X-ray data reduction for multiple samples using a SLURM job array. It processes diffraction frames via azimuthal integration with pyFAI, averages frames, subtracts background, and checks for radiation damage.",
+    "domain": [
+        "physics",
+        "data science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [
+                    "PONI_FILE=/beamline_data/calibration/detector_2026Q3.poni",
+                    "DARK_FRAME=/beamline_data/calibration/dark_average.edf",
+                    "FRAME_DIR=${FRAME_DIR}",
+                    "FRAME_PATTERN=${FRAME_PATTERN}",
+                    "OUT_DIR=reduced/${SAMPLE_NAME}",
+                    "SAMPLE_NAME=${SAMPLE_NAME}"
+                ],
+                "step_description": "Performs azimuthal integration on diffraction frames using pyFAI, subtracting dark frames, and saving I(q) data to output files."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "average_and_subtract_background.py",
+                "parameters": [
+                    "--frames-dir",
+                    "reduced/${SAMPLE_NAME}",
+                    "--background-file",
+                    "/beamline_data/backgrounds/buffer_${SAMPLE_NAME%%_*}.dat",
+                    "--output",
+                    "reduced/${SAMPLE_NAME}/${SAMPLE_NAME}_final_iq.dat"
+                ],
+                "step_description": "Averages the integrated frames and subtracts the background to produce a final I(q) dataset."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "check_radiation_damage.py",
+                "parameters": [
+                    "--frames-dir",
+                    "reduced/${SAMPLE_NAME}",
+                    "--output",
+                    "reduced/${SAMPLE_NAME}/${SAMPLE_NAME}_damage_check.json"
+                ],
+                "step_description": "Checks for radiation damage across the frame series by analyzing the integrated data and saving results in JSON format."
+            }
+        }
+    ]
+}

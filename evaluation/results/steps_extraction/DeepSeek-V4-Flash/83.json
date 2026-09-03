@@ -1,0 +1,101 @@
+{
+    "description": "Run a MOM6 ocean model simulation in segments with restart handling, check for numerical instabilities, archive restart files, and optionally compute eddy kinetic energy analysis.",
+    "domain": "oceanography",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "MOM6",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Run the MOM6 ocean model simulation using srun with MPI, detecting and handling restarts."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Check simulation log for NaN values and flag errors, if found exit with error."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Extract maximum velocity from simulation log and potentially warn if it exceeds a threshold."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Archive restart files into a directory organized by model year."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_eddy_kinetic_energy.py",
+                "parameters": [
+                    "--history-dir",
+                    ".",
+                    "--output",
+                    "analysis/eke_climatology.nc"
+                ],
+                "step_description": "If target simulation length is reached, compute eddy kinetic energy climatology using a Python script."
+            }
+        }
+    ]
+}

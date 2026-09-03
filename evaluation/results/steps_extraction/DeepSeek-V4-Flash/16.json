@@ -1,0 +1,71 @@
+{
+    "description": "Quantum ESPRESSO phonon calculation workflow with SCF, phonon, and q2r steps",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "pw.x",
+                "executed_file": null,
+                "parameters": [
+                    "-nk 8",
+                    "-in scf.in",
+                    "> scf.out"
+                ],
+                "step_description": "Runs the SCF calculation using pw.x with 128 MPI processes."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "ph.x",
+                "executed_file": null,
+                "parameters": [
+                    "-nk 4",
+                    "-in ph.in",
+                    "> ph.out"
+                ],
+                "step_description": "Runs the phonon calculation using ph.x with 64 MPI processes."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "q2r.x",
+                "executed_file": null,
+                "parameters": [
+                    "-in q2r.in",
+                    "> q2r.out"
+                ],
+                "step_description": "Runs the q2r.x step to convert phonon results to real-space force constants."
+            }
+        }
+    ]
+}

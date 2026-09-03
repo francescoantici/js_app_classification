@@ -1,0 +1,29 @@
+{
+    "description": "Run a VASP simulation for a perovskite material using MPI with specified parallelization settings.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "VASP",
+                "executed_file": null,
+                "parameters": [
+                    "-np 64",
+                    "vasp_std",
+                    "NCORE=4",
+                    "NPAR=2"
+                ],
+                "step_description": "Load VASP module, set environment variables NCORE and NPAR, and run vasp_std with 64 MPI processes redirecting output to vasp_job.perovskite.out."
+            }
+        }
+    ]
+}

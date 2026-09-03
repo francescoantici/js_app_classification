@@ -1,0 +1,54 @@
+{
+    "description": "This job script installs and runs a Cylc-managed WRF ensemble workflow, with an initial cycle point set to 20240101T00Z.",
+    "domain": [
+        "earth science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "cylc"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "cylc",
+                "executed_file": null,
+                "parameters": [
+                    "install",
+                    "wrf_ensemble"
+                ],
+                "step_description": "Installs the Cylc workflow named 'wrf_ensemble', making it available for execution."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "cylc"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "WRF",
+                "executed_file": null,
+                "parameters": [
+                    "play",
+                    "wrf_ensemble",
+                    "--no-detach",
+                    "--debug",
+                    "-m",
+                    "initial_cycle_point=20240101T00Z"
+                ],
+                "step_description": "Launches the WRF ensemble workflow in no-detach mode with debug output, initializing the run at the specified cycle point."
+            }
+        }
+    ]
+}

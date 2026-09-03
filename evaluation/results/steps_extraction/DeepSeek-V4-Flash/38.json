@@ -1,0 +1,32 @@
+{
+    "description": "Train a Graph Neural Network (GNN) model on the OGBG-MolHIV dataset using PyTorch Geometric inside a container on a GPU cluster.",
+    "domain": [
+        "artificial intelligence",
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "enroot"
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_gnn.py",
+                "parameters": [
+                    "--dataset ogbg-molhiv",
+                    "--model gin",
+                    "--epochs=100",
+                    "--device=cuda"
+                ],
+                "step_description": "Run a PyTorch Geometric training script inside an enroot container, executing on the GPU partition."
+            }
+        }
+    ]
+}

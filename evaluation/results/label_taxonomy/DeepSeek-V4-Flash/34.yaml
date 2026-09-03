@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: singularity
+workload:
+  primary_software: python
+  target_executable: lattice_qcd.py
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

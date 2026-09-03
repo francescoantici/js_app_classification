@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: fireworks
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: vasp
+  target_executable: vasp_workflow.py
+  workload_category: simulation_modeling
+compute_profile: []

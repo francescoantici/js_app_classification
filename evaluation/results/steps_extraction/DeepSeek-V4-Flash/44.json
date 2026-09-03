@@ -1,0 +1,27 @@
+{
+    "description": "Run ORCA excited states calculation with 8 cores and 64GB memory on a quantum partition.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "ORCA",
+                "executed_file": null,
+                "parameters": [
+                    "PAL=8",
+                    "MAXCORE=4000"
+                ],
+                "step_description": "Load ORCA 5.0.4 module, set parallelization and memory environment variables, and run ORCA on the input file excited_states.inp."
+            }
+        }
+    ]
+}

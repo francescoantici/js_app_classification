@@ -1,0 +1,199 @@
+{
+    "description": "A GW-BSE computational workflow for calculating the optical spectrum of a material, involving mean-field DFT with Quantum ESPRESSO, followed by BerkeleyGW calculations for the dielectric matrix, self-energy, and Bethe-Salpeter equation, and finally plotting the spectrum with Python.",
+    "domain": [
+        "physics",
+        "materials science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Quantum ESPRESSO",
+                "executed_file": null,
+                "parameters": [
+                    "-npool",
+                    "4",
+                    "-in",
+                    "scf.in",
+                    ">",
+                    "scf.out"
+                ],
+                "step_description": "Runs mean-field DFT calculation (scf.in) using pw.x with npool=4."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Quantum ESPRESSO",
+                "executed_file": null,
+                "parameters": [
+                    "-npool",
+                    "4",
+                    "-in",
+                    "wfn.in",
+                    ">",
+                    "wfn.out"
+                ],
+                "step_description": "Runs wavefunction calculation (wfn.in) using pw.x with npool=4."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Quantum ESPRESSO",
+                "executed_file": null,
+                "parameters": [
+                    "-npool",
+                    "4",
+                    "-in",
+                    "wfnq.in",
+                    ">",
+                    "wfnq.out"
+                ],
+                "step_description": "Runs wavefunction calculation for q-points (wfnq.in) using pw.x with npool=4."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "BerkeleyGW",
+                "executed_file": null,
+                "parameters": [
+                    "epsilon.cplx.x",
+                    "epsilon.inp",
+                    ">",
+                    "epsilon.out"
+                ],
+                "step_description": "Computes the dielectric matrix using epsilon.cplx.x."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "BerkeleyGW",
+                "executed_file": null,
+                "parameters": [
+                    "sigma.cplx.x",
+                    "sigma.inp",
+                    ">",
+                    "sigma.out"
+                ],
+                "step_description": "Computes GW quasiparticle corrections using sigma.cplx.x."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "BerkeleyGW",
+                "executed_file": null,
+                "parameters": [
+                    "kernel.cplx.x",
+                    "kernel.inp",
+                    ">",
+                    "kernel.out"
+                ],
+                "step_description": "Computes the electron-hole interaction kernel using kernel.cplx.x."
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "BerkeleyGW",
+                "executed_file": null,
+                "parameters": [
+                    "absorption.cplx.x",
+                    "absorption.inp",
+                    ">",
+                    "absorption.out"
+                ],
+                "step_description": "Computes the optical absorption spectrum using absorption.cplx.x."
+            }
+        },
+        {
+            "step_id": 8,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "plot_absorption_spectrum.py",
+                "parameters": [
+                    "--input",
+                    "absorption_eh.dat",
+                    "--output",
+                    "optical_spectrum.png"
+                ],
+                "step_description": "Runs a Python script to plot the absorption spectrum and save it as an image."
+            }
+        }
+    ]
+}

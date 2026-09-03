@@ -1,0 +1,91 @@
+{
+    "description": "Run a SLEPc eigensolver job on a large Hamiltonian matrix, with optional scaling study, using PETSc and SLEPc libraries via Slurm.",
+    "domain": [
+        "physics",
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs results",
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load openmpi/4.1.5",
+                    "module load petsc/3.20.0",
+                    "module load slepc/3.20.0",
+                    "cd /projects/myuser/eigen/large_hamiltonian"
+                ],
+                "step_description": "Set up environment: create directories, purge modules, load required compilers and libraries, and change to the case directory."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "SLEPc",
+                "executed_file": null,
+                "parameters": [
+                    "srun --mpi=pmix ./eigensolver",
+                    "-f hamiltonian_2M.petsc",
+                    "-eps_nev 50",
+                    "-eps_type krylovschur",
+                    "-eps_target 0.0",
+                    "-eps_which target_magnitude",
+                    "-st_type sinvert",
+                    "-st_ksp_type preonly",
+                    "-st_pc_type cholesky",
+                    "-st_pc_factor_mat_solver_type mumps",
+                    "-eps_tol 1e-10",
+                    "-eps_max_it 500",
+                    "-eps_monitor",
+                    "-log_view :results/solver_performance.log",
+                    "> results/eigenvalues_output.txt"
+                ],
+                "step_description": "Run the SLEPc eigensolver on the Hamiltonian matrix to compute 50 eigenvalues using Krylov-Schur with shift-invert and MUMPS preconditioner, output results to file."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "CONVERGED=$(grep -c 'CONVERGED' results/eigenvalues_output.txt || true)",
+                    "echo 'Converged eigenpairs: $CONVERGED / $N_EIGENVALUES'",
+                    "if [ \"$CONVERGED\" -lt \"$N_EIGENVALUES\" ]; then echo '[WARN] Not all requested eigenpairs converged. Consider more iterations or better preconditioner.'; fi"
+                ],
+                "step_description": "Check convergence by counting 'CONVERGED' lines in the output and print a warning if not all eigenpairs converged."
+            }
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+orchestration:
+  type: job_array
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: python
+  target_executable: monte_carlo_sim.py
+  workload_category: simulation_modeling
+compute_profile: []

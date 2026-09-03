@@ -1,0 +1,32 @@
+{
+    "description": "Process telescope night data using an astronomy Python environment, including bias and flat calibration steps.",
+    "domain": [
+        "astronomy"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "process_night.py",
+                "parameters": [
+                    "--night-index=$PBS_ARRAY_INDEX",
+                    "--raw-dir=/telescope/raw/2024",
+                    "--calibrated-dir=/data/calibrated",
+                    "--process-bias",
+                    "--process-flats"
+                ],
+                "step_description": "Run the Python script process_night.py with night index from PBS array, specifying raw and calibrated directories, and enabling bias and flat processing."
+            }
+        }
+    ]
+}

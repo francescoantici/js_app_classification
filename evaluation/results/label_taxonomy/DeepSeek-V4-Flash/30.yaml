@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: CP2K
+  target_executable: cp2k.psmp
+  workload_category: simulation_modeling
+compute_profile:
+- mpi
+- openmp

@@ -1,0 +1,28 @@
+{
+    "description": "The job runs a lattice QCD simulation on a CPU cluster, using MPI with 512 processes, and executes a Python script inside a container with specific lattice parameters.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "singularity"
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "python",
+                "executed_file": "lattice_qcd.py",
+                "parameters": [
+                    "--lattice-size=64,64,64,128",
+                    "--beta=6.0",
+                    "--configurations=1000"
+                ],
+                "step_description": "Runs lattice QCD simulation using Python script inside a Singularity container with MPI and specified lattice parameters."
+            }
+        }
+    ]
+}

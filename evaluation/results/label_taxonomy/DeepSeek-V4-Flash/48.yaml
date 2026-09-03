@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: apptainer
+workload:
+  primary_software: python
+  target_executable: train_dreambooth.py
+  workload_category: ai_ml
+compute_profile:
+- distributed_framework

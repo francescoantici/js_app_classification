@@ -1,0 +1,31 @@
+{
+    "description": "This job loads a Python environment, activates a Jupyter environment, and executes a Jupyter notebook for exploratory data analysis.",
+    "domain": [
+        "data science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "run_notebook.py",
+                "parameters": [
+                    "--notebook=eda_analysis.ipynb",
+                    "--execute",
+                    "--output=eda_executed.html",
+                    "--timeout=7200"
+                ],
+                "step_description": "Executes a Jupyter notebook for exploratory data analysis using a Python script with execution parameters."
+            }
+        }
+    ]
+}

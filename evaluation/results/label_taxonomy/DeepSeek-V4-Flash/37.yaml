@@ -1,0 +1,11 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: python
+  target_executable: ml_pipeline.sh
+  workload_category: ai_ml
+compute_profile: []

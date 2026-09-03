@@ -1,0 +1,31 @@
+{
+    "description": "Run a machine learning pipeline with structure generation, training and evaluation stages using SLURM job scheduler.",
+    "domain": [
+        "ai"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "bash",
+                "executed_file": "ml_pipeline.sh",
+                "parameters": [
+                    "stage=full",
+                    "--model xgboost",
+                    "--iterations 500",
+                    "--metrics auc,accuracy"
+                ],
+                "step_description": "Execute the machine learning pipeline script with full stage, passing training and evaluation arguments."
+            }
+        }
+    ]
+}

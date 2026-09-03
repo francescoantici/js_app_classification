@@ -1,0 +1,31 @@
+{
+    "description": "Set up environment for SPECFEM3D seismic simulation by loading necessary modules and setting a reference sequence variable.",
+    "domain": "geophysics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": null,
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load compiler/gcc/11.2.0",
+                    "module load mpi/openmpi/4.1.1",
+                    "module load libraries/hdf5/1.12.1",
+                    "module load geophysics/specfem3d/4.1.0",
+                    "export REFSEQ=/databases/hg38.fa"
+                ],
+                "step_description": "Loads required compiler, MPI, HDF5, and SPECFEM3D modules; sets REFSEQ environment variable; prints confirmation message."
+            }
+        }
+    ]
+}

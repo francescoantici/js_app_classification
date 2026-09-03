@@ -1,0 +1,30 @@
+{
+    "description": "Run a nextflow-based RNA-seq pipeline with docker containers, specifying input reads, genome, and output",
+    "domain": "bioinformatics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "nextflow"
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "docker"
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "nextflow",
+                "executed_file": "rnaseq_pipeline.nf",
+                "parameters": [
+                    "-profile docker",
+                    "--reads 'data/*_R{1,2}.fastq.gz'",
+                    "--genome GRCh38",
+                    "--outdir results/",
+                    "-with-report execution_report.html"
+                ],
+                "step_description": "Run the nextflow RNA-seq pipeline using docker containers for execution."
+            }
+        }
+    ]
+}

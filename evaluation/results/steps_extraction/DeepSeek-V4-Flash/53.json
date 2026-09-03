@@ -1,0 +1,61 @@
+{
+    "description": "This job script executes a Monte Carlo simulation sweep across a parameter grid. It generates a parameter table on the first array task, waits for the file to be created, then processes each task by running the simulation script with the specific parameters and writing results to JSON files.",
+    "domain": [
+        "chemistry",
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "python3",
+                "executed_file": null,
+                "parameters": [
+                    "-",
+                    "params.tsv"
+                ],
+                "step_description": "Generates the parameter sweep table (params.tsv) using a Python script embedded in the job script. This step runs only on the first array task when the file is missing."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "python",
+                "executed_file": "monte_carlo_sim.py",
+                "parameters": [
+                    "--temperature",
+                    "$TEMP",
+                    "--pressure",
+                    "$PRESSURE",
+                    "--concentration",
+                    "$CONC",
+                    "--seed",
+                    "$SEED",
+                    "--n-samples",
+                    "1000000",
+                    "--output",
+                    "$OUT"
+                ],
+                "step_description": "Runs the Monte Carlo simulation (monte_carlo_sim.py) for each array task, using parameters read from params.tsv, and writes the output to results/run_${TASK_ID}.json."
+            }
+        }
+    ]
+}

@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: pytorch
+  target_executable: train.py
+  workload_category: ai_ml
+compute_profile:
+- distributed_framework
+- openmp

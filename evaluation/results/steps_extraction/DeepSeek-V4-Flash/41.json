@@ -1,0 +1,31 @@
+{
+    "description": "Cleanup CFD simulation directory by removing old runs, core dumps, and compressing logs.",
+    "domain": [
+        "engineering"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": "cleanup_cfd.sh",
+                "parameters": [
+                    "--sim-dir=/scratch/cfd/run_045",
+                    "--keep-last=5",
+                    "--remove-core-dumps",
+                    "--compress-logs"
+                ],
+                "step_description": "Executes cleanup script for CFD simulation directory with specified options."
+            }
+        }
+    ]
+}

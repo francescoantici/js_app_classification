@@ -1,0 +1,11 @@
+orchestration:
+  type: job_array
+  tool_detected: null
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: Qiskit
+  target_executable: vqe_molecule.py
+  workload_category: simulation_modeling
+compute_profile: []

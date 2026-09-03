@@ -1,0 +1,32 @@
+{
+    "description": "The job script sets up a bioinformatics environment by loading modules for BWA, SAMtools, GATK, and BCFtools, and defines reference and Java memory variables.",
+    "domain": "bioinformatics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load bioinformatics/bwa/0.7.17",
+                    "module load bioinformatics/samtools/1.16",
+                    "module load bioinformatics/gatk/4.4.0",
+                    "module load bioinformatics/bcftools/1.17",
+                    "export REFSEQ=/databases/hg38.fa",
+                    "export GATK_JAVA_OPTS=-Xmx64g"
+                ],
+                "step_description": "Purges existing modules, loads required bioinformatics tools, and sets environment variables for the reference genome and Java memory options."
+            }
+        }
+    ]
+}

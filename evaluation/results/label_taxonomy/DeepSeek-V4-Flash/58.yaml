@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: GROMACS
+  target_executable: mdrun
+  workload_category: simulation_modeling
+compute_profile:
+- mpi
+- openmp

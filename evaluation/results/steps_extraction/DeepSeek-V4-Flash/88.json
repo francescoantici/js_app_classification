@@ -1,0 +1,62 @@
+{
+    "description": "Gravitational wave matched filter search job array processing data chunks with PyCBC",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "build_search_chunks.py",
+                "parameters": [
+                    "--gps-start 1400000000",
+                    "--gps-end 1400864000",
+                    "--segment-length 4096",
+                    "--template-bank full_bank.xml",
+                    "--n-subbanks 20",
+                    "--detectors H1 L1",
+                    "--output search_chunks.tsv"
+                ],
+                "step_description": "Build search chunk table if not exists"
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "pycbc_inspiral",
+                "executed_file": null,
+                "parameters": [
+                    "--gps-start-time $GPS_START",
+                    "--gps-end-time $GPS_END",
+                    "--instrument $DETECTOR",
+                    "--strain-data-file strain/${DETECTOR}_strain.gwf",
+                    "--template-bank $BANK_FILE",
+                    "--approximant SEOBNRv4",
+                    "--low-frequency-cutoff 20",
+                    "--snr-threshold 5.5",
+                    "--chisq-threshold 5.0",
+                    "--processing-scheme cpu:${SLURM_CPUS_PER_TASK}",
+                    "--output triggers/chunk_${ID}_triggers.hdf"
+                ],
+                "step_description": "Run PyCBC matched filter search on assigned data chunk"
+            }
+        }
+    ]
+}

@@ -1,0 +1,29 @@
+{
+    "description": "Loads R and runs a climate data analysis script on CMIP6 temperature data to generate a trends plot.",
+    "domain": "climate science",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "R",
+                "executed_file": "climate_analysis.R",
+                "parameters": [
+                    "--input-dir=/data/cmip6",
+                    "--variable=temperature",
+                    "--region=global",
+                    "--output=figures/climate_trends.pdf"
+                ],
+                "step_description": "Loads R module and executes the R script for climate data analysis."
+            }
+        }
+    ]
+}

@@ -1,0 +1,97 @@
+{
+    "description": "DNS turbulence simulation with checkpointing, resubmission, and statistical analysis",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "dns_solver",
+                "executed_file": null,
+                "parameters": [
+                    "--resolution 1024",
+                    "--reynolds-lambda 200",
+                    "--pencil-decomp auto",
+                    "--restart-file path or --init-spectrum kolmogorov --seed 42",
+                    "--run-eddy-turnovers 2",
+                    "--checkpoint-dir checkpoints",
+                    "--spectrum-output spectra",
+                    "--dealias 2/3"
+                ],
+                "step_description": "Set up environment, prepare directories, and launch DNS turbulence simulation using dns_solver with checkpointing and spectrum output."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "check_stationarity.py",
+                "parameters": [
+                    "--spectrum-dir spectra",
+                    "--output spectra/stationarity_report.json"
+                ],
+                "step_description": "Extract current eddy turnovers from checkpoint filename and run stationarity check script to determine if flow is statistically stationary."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "awk comparison for eddy turnover target",
+                    "environment variable IS_STATIONARY",
+                    "sbatch $0 for resubmission"
+                ],
+                "step_description": "Check if further simulation is needed based on eddy turnover count and stationarity; if so, resubmit job using sbatch, otherwise proceed to final statistics."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_turbulence_statistics.py",
+                "parameters": [
+                    "--checkpoint $LATEST_CKPT",
+                    "--output final_stats.json"
+                ],
+                "step_description": "Compute final turbulence statistics including structure functions and dissipation rate when target reached or stationary confirmed."
+            }
+        }
+    ]
+}

@@ -1,0 +1,33 @@
+{
+    "description": "Submit a FireWorks managed VASP workflow on a GPU partition with specified resources and configuration.",
+    "domain": [
+        "materials science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "fireworks"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "python",
+                "executed_file": "vasp_workflow.py",
+                "parameters": [
+                    "-q",
+                    "dual_gpu",
+                    "--config_file",
+                    "vasp_config.yaml",
+                    "FW_CONFIG_FILE=/opt/fireworks/config.json",
+                    "LPAD_FILE=/project/db/launchpad.yaml"
+                ],
+                "step_description": "Run the VASP workflow Python script with specified queue and configuration file, while setting FireWorks environment variables."
+            }
+        }
+    ]
+}

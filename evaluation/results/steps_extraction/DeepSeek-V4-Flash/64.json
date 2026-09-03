@@ -1,0 +1,49 @@
+{
+    "description": "Run GADGET-4 cosmological simulation with restart support and optional halo finding, resubmitting continuation if target redshift not reached.",
+    "domain": "physics, cosmology",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "GADGET-4",
+                "executed_file": "./Gadget4",
+                "parameters": [
+                    "param.txt"
+                ],
+                "step_description": "Run GADGET-4 cosmological simulation from latest checkpoint or fresh start."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "${CASE_DIR}/scripts/run_subfind_summary.py",
+                "parameters": [
+                    "--snapshot",
+                    "$LAST_SNAP",
+                    "--output",
+                    "halo_catalog_final.hdf5"
+                ],
+                "step_description": "Run Python halo finder and summary script after simulation completion."
+            }
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: Geant4
+  target_executable: ./DetectorSim
+  workload_category: simulation_modeling
+compute_profile: []

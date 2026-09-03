@@ -1,0 +1,33 @@
+{
+    "description": "This job runs a medical image segmentation inference using a pre-trained U-Net 3D model on MRI scans, utilizing a TensorFlow environment with GPU acceleration.",
+    "domain": [
+        "healthcare",
+        "medical imaging"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "segmentation_inference.py",
+                "parameters": [
+                    "--model-path=models/unet_3d.h5",
+                    "--input-dir=/data/mri_scans/",
+                    "--output-dir=/results/segmentations/",
+                    "--batch-size=8",
+                    "--gpus=2"
+                ],
+                "step_description": "Activates the TensorFlow environment and runs the segmentation inference script on MRI scans using a U-Net model with GPU support."
+            }
+        }
+    ]
+}

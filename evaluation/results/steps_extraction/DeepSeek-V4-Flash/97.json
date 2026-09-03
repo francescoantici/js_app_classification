@@ -1,0 +1,115 @@
+{
+    "description": "High-throughput screening of Li-containing material candidates using VASP DFT relaxation and Python analysis, submitted as a SLURM job array.",
+    "domain": [
+        "materials science",
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "build_candidate_manifest.py",
+                "parameters": [
+                    "--database /projects/myuser/materials_db/candidates",
+                    "--filter contains_element=Li",
+                    "--max-candidates 500",
+                    "--output candidates.tsv"
+                ],
+                "step_description": "Build the candidate manifest from a structure database by filtering for Li-containing structures and limiting to 500 candidates."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [
+                    "-c",
+                    "from pymatgen.core import Structure; from pymatgen.io.vasp.sets import MPRelaxSet; struct = Structure.from_file('${CIF_PATH}'); vasp_set = MPRelaxSet(struct); vasp_set.write_input('.')"
+                ],
+                "step_description": "Use pymatgen to generate VASP input files for the candidate structure using MPRelaxSet."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "VASP",
+                "executed_file": "vasp_std",
+                "parameters": [
+                    "-n",
+                    "$SLURM_NTASKS"
+                ],
+                "step_description": "Run VASP DFT relaxation for the candidate material using mpirun."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_formation_energy.py",
+                "parameters": [
+                    "--outcar OUTCAR",
+                    "--formula $FORMULA"
+                ],
+                "step_description": "Compute formation energy from VASP OUTCAR output."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_band_gap.py",
+                "parameters": [
+                    "--vasprun vasprun.xml"
+                ],
+                "step_description": "Compute band gap from VASP vasprun.xml output."
+            }
+        }
+    ]
+}

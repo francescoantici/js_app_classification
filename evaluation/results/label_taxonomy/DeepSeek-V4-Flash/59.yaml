@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: sbatch pipeline
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: python
+  target_executable: ingest_validate.py
+  workload_category: data_processing_etl
+compute_profile: []

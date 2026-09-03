@@ -1,0 +1,31 @@
+{
+    "description": "Synchronize experimental data from local storage to a remote backup location using rsync with checksum verification and partial transfer support.",
+    "domain": "data storage",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "rsync",
+                "executed_file": null,
+                "parameters": [
+                    "-avh",
+                    "--progress",
+                    "--checksum",
+                    "--partial-dir=.rsync-partial",
+                    "/data/experiment_2024/",
+                    "user@storage.hpc:/backup/experiment_2024/"
+                ],
+                "step_description": "Copy files from /data/experiment_2024/ to remote backup using rsync with archive, verbose, human-readable, progress, checksum, and partial-dir options."
+            }
+        }
+    ]
+}

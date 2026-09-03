@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: python
+  target_executable: process_satellite_dask.py
+  workload_category: data_processing_etl
+compute_profile:
+- distributed_framework

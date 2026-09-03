@@ -1,0 +1,162 @@
+{
+    "description": "Run a parallel MPI scientific simulation using SLURM job scheduler, stage input data, execute the solver, merge HDF5 results with Python, archive outputs, and clean up scratch space.",
+    "domain": [
+        "physics",
+        "engineering"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "set -euo pipefail",
+                    "trap 'echo \"[ERROR] line $LINENO: command failed\" >&2' ERR",
+                    "mkdir -p logs",
+                    "echo \"=== Job Info ===\"",
+                    "echo \"Job ID:       $SLURM_JOB_ID\"",
+                    "echo \"Nodes:        $SLURM_JOB_NODELIST\"",
+                    "echo \"Total tasks:  $SLURM_NTASKS\"",
+                    "echo \"Start time:   $(date)\""
+                ],
+                "step_description": "Setup job environment: set shell options, trap errors, create log directory, and print job information."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "module",
+                "executed_file": null,
+                "parameters": [
+                    "purge",
+                    "load gcc/12.2.0",
+                    "load openmpi/4.1.5",
+                    "load hdf5/1.14.0-mpi"
+                ],
+                "step_description": "Load required environment modules (GCC, OpenMPI, HDF5 with MPI support)."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "PROJECT_DIR=\"/projects/myuser/simulation\"",
+                    "SCRATCH_DIR=\"/scratch/${USER}/${SLURM_JOB_ID}\"",
+                    "INPUT_DECK=\"${PROJECT_DIR}/input/case_001.deck\"",
+                    "mkdir -p \"$SCRATCH_DIR\"",
+                    "cd \"$SCRATCH_DIR\"",
+                    "cp \"$INPUT_DECK\" .",
+                    "cp -r \"${PROJECT_DIR}/mesh\" ."
+                ],
+                "step_description": "Set up directories, stage input deck and mesh data to scratch space."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "solver",
+                "executed_file": "/projects/myuser/simulation/bin/solver",
+                "parameters": [
+                    "--input",
+                    "case_001.deck",
+                    "--mesh",
+                    "./mesh",
+                    "--checkpoint-every",
+                    "500",
+                    "--output",
+                    "./results"
+                ],
+                "step_description": "Launch the main MPI simulation solver using srun with pmix."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "/projects/myuser/simulation/scripts/merge_hdf5.py",
+                "parameters": [
+                    "--input-dir",
+                    "./results",
+                    "--output",
+                    "./results/merged_${SLURM_JOB_ID}.h5"
+                ],
+                "step_description": "Load python and run script to merge HDF5 result files from the simulation."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "ARCHIVE_DIR=\"${PROJECT_DIR}/results/${SLURM_JOB_ID}\"",
+                    "mkdir -p \"$ARCHIVE_DIR\"",
+                    "cp ./results/merged_*.h5 \"$ARCHIVE_DIR/\"",
+                    "cp ./logs/* \"$ARCHIVE_DIR/\" 2>/dev/null || true",
+                    "cd /",
+                    "rm -rf \"$SCRATCH_DIR\"",
+                    "echo \"End time: $(date)\"",
+                    "echo \"Job completed successfully. Results archived to $ARCHIVE_DIR\""
+                ],
+                "step_description": "Archive results and logs to permanent storage, clean up scratch directory, and print completion messages."
+            }
+        }
+    ]
+}

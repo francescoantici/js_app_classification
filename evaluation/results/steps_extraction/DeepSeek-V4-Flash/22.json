@@ -1,0 +1,30 @@
+{
+    "description": "Run a metagenomics analysis pipeline using Nextflow with Apptainer containers, processing paired-end FASTQ reads against a Metaphlan4 database.",
+    "domain": "biology",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "nextflow"
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "apptainer"
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "nextflow",
+                "executed_file": "metagenomics_pipeline.nf",
+                "parameters": [
+                    "-profile apptainer",
+                    "--reads 'fastqs/*.{1,2}.fastq.gz'",
+                    "--db /databases/metaphlan4",
+                    "--outdir results/",
+                    "-resume"
+                ],
+                "step_description": "Execute the metagenomics Nextflow pipeline with Apptainer profile, specifying input reads, database, output directory, and resume mode."
+            }
+        }
+    ]
+}

@@ -1,0 +1,27 @@
+{
+    "description": "Run SU2 combustion simulation using Docker container with MPI across multiple nodes and GPUs.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "docker"
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "SU2",
+                "executed_file": null,
+                "parameters": [
+                    "combustion.cfg",
+                    "-np 32"
+                ],
+                "step_description": "Run SU2_CFD combustion simulation inside Docker container with MPI across 32 processes."
+            }
+        }
+    ]
+}

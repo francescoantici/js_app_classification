@@ -1,0 +1,26 @@
+{
+    "description": "Submit a Gaussian 16 quantum chemistry job on 2 nodes with 16 tasks per node, 64GB memory per node, and a wall time of 168 hours (7 days). The script loads the Gaussian module, sets scratch and memory environment variables, and runs a Gaussian geometry optimization calculation for a transition state search using input file catalyst_ts.com.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Gaussian",
+                "executed_file": null,
+                "parameters": [
+                    "< catalyst_ts.com > catalyst_ts.log"
+                ],
+                "step_description": "Load Gaussian module, set scratch and memory environment variables, and run Gaussian 16 on the input file catalyst_ts.com, outputting to catalyst_ts.log."
+            }
+        }
+    ]
+}

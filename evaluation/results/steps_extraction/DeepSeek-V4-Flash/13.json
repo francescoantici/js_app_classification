@@ -1,0 +1,30 @@
+{
+    "description": "Run a MATLAB finite element analysis (FEA) simulation for a composite material, loading a mesh, applying a temperature of 150, and saving stress analysis results.",
+    "domain": "engineering",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "MATLAB",
+                "executed_file": "composite_fea",
+                "parameters": [
+                    "mesh_file=composite_geometry.inp",
+                    "temperature=150",
+                    "output=stress_analysis.mat",
+                    "-singleCompThread",
+                    "-nojvm"
+                ],
+                "step_description": "Run MATLAB batch script composite_fea with input mesh file, temperature 150, output file stress_analysis.mat, using single computation thread and no JVM."
+            }
+        }
+    ]
+}

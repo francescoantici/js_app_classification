@@ -1,0 +1,32 @@
+{
+    "description": "Distributed training of ResNet50 on 4 nodes with 8 V100 GPUs per node using PyTorch and NCCL backend.",
+    "domain": "ai",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_resnet_distributed.py",
+                "parameters": [
+                    "--batch-size=256",
+                    "--epochs=100",
+                    "--lr=0.1",
+                    "--world-size=4",
+                    "--dist-backend=nccl",
+                    "MASTER_ADDR=$(hostname -s)",
+                    "MASTER_PORT=29500"
+                ],
+                "step_description": "Runs distributed ResNet50 training script with specified hyperparameters and distributed environment variables."
+            }
+        }
+    ]
+}

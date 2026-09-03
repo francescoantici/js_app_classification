@@ -1,0 +1,284 @@
+{
+    "description": "Genome assembly pipeline for a species using HiFi and ONT reads, including assembly with hifiasm, statistics with QUAST, completeness with BUSCO, and read mapping for coverage validation.",
+    "domain": "genomics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "hifiasm",
+                "executed_file": null,
+                "parameters": [
+                    "-o",
+                    "assembly/species_x",
+                    "-t",
+                    "$SLURM_NTASKS",
+                    "--ul",
+                    "$ONT_READS",
+                    "$HIFI_READS"
+                ],
+                "step_description": "Run hifiasm to assemble the genome using HiFi and ONT reads."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "awk",
+                "executed_file": null,
+                "parameters": [
+                    "'/^S/{print \">\"$2\"\\n\"$3}'",
+                    "assembly/species_x.bp.p_ctg.gfa > assembly/species_x.contigs.fasta"
+                ],
+                "step_description": "Convert the assembly graph to FASTA format."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "quast.py",
+                "executed_file": null,
+                "parameters": [
+                    "assembly/species_x.contigs.fasta",
+                    "-o",
+                    "assembly/quast_report",
+                    "--threads",
+                    "$SLURM_NTASKS",
+                    "--large",
+                    "--est-ref-size",
+                    "2800000000"
+                ],
+                "step_description": "Compute assembly statistics (N50, contig count) using QUAST."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "grep",
+                "executed_file": null,
+                "parameters": [
+                    "N50",
+                    "assembly/quast_report/report.txt"
+                ],
+                "step_description": "Extract N50 and contig count from QUAST report."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Conditional warning if the assembly is highly fragmented."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "busco",
+                "executed_file": null,
+                "parameters": [
+                    "-i",
+                    "assembly/species_x.contigs.fasta",
+                    "-o",
+                    "busco_species_x",
+                    "-m",
+                    "genome",
+                    "-l",
+                    "vertebrata_odb10",
+                    "-c",
+                    "$SLURM_NTASKS",
+                    "--out_path",
+                    "assembly"
+                ],
+                "step_description": "Run BUSCO to assess genome completeness."
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "grep",
+                "executed_file": null,
+                "parameters": [
+                    "Complete BUSCOs",
+                    "assembly/busco_species_x/short_summary*.txt"
+                ],
+                "step_description": "Extract BUSCO completeness percentage from the summary."
+            }
+        },
+        {
+            "step_id": 8,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "minimap2",
+                "executed_file": null,
+                "parameters": [
+                    "-ax",
+                    "map-hifi",
+                    "-t",
+                    "$SLURM_NTASKS",
+                    "assembly/species_x.contigs.fasta",
+                    "$HIFI_READS"
+                ],
+                "step_description": "Map HiFi reads back to the assembly for alignment."
+            }
+        },
+        {
+            "step_id": 9,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "samtools",
+                "executed_file": null,
+                "parameters": [
+                    "sort",
+                    "-@",
+                    "$SLURM_NTASKS",
+                    "-o",
+                    "assembly/readback.sorted.bam"
+                ],
+                "step_description": "Sort aligned reads into a BAM file."
+            }
+        },
+        {
+            "step_id": 10,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "samtools",
+                "executed_file": null,
+                "parameters": [
+                    "index",
+                    "assembly/readback.sorted.bam"
+                ],
+                "step_description": "Index the sorted BAM file."
+            }
+        },
+        {
+            "step_id": 11,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "samtools",
+                "executed_file": null,
+                "parameters": [
+                    "depth",
+                    "-a",
+                    "assembly/readback.sorted.bam"
+                ],
+                "step_description": "Calculate read depth across the assembly."
+            }
+        },
+        {
+            "step_id": 12,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "awk",
+                "executed_file": null,
+                "parameters": [
+                    "'{sum+=$3; n++} END {print \"mean_coverage:\", sum/n}'",
+                    "> assembly/coverage_summary.txt"
+                ],
+                "step_description": "Compute mean coverage and save to a summary file."
+            }
+        }
+    ]
+}

@@ -1,0 +1,30 @@
+{
+    "description": "Distributed training of the ESM-1b protein language model using MPI across 8 GPU nodes.",
+    "domain": "bioinformatics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_esm_mpi.py",
+                "parameters": [
+                    "--model esm-1b",
+                    "--pdb-data=/data/pdb",
+                    "--batch-size=16",
+                    "--epochs=50",
+                    "MPI environment: MASTER_PORT=12355, OMP_NUM_THREADS=12"
+                ],
+                "step_description": "Launch distributed training of ESM-1b model using MPI with 32 processes (8 nodes x 4 tasks) on GPU nodes."
+            }
+        }
+    ]
+}

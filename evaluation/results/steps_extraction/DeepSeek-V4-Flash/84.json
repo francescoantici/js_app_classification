@@ -1,0 +1,70 @@
+{
+    "description": "This job script performs a cosmological hydrodynamics simulation using Nyx AMR code, with checkpointing and restart capabilities. It runs a 100 Mpc Lyman-alpha forest simulation up to z=0, then computes flux power spectrum statistics using Python.",
+    "domain": "physics, cosmology",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Nyx",
+                "executed_file": null,
+                "parameters": [
+                    "inputs_segment"
+                ],
+                "step_description": "Runs the Nyx AMR cosmological simulation executable (Nyx3d.gnu.MPI.ex) with the provided input file, using MPI via srun."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "extract_scale_factor.py",
+                "parameters": [
+                    "--checkpoint",
+                    "$LATEST_CHK"
+                ],
+                "step_description": "Extracts the current scale factor from the latest Nyx checkpoint to determine whether the simulation has reached the target redshift."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_lya_flux_power.py",
+                "parameters": [
+                    "--checkpoint",
+                    "$LATEST_CHK",
+                    "--output",
+                    "analysis/lya_flux_power_spectrum.json"
+                ],
+                "step_description": "Computes the Lyman-alpha forest flux power spectrum from the final checkpoint and saves the results to a JSON file."
+            }
+        }
+    ]
+}

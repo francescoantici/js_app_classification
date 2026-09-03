@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: docker
+workload:
+  primary_software: SU2
+  target_executable: SU2_CFD
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

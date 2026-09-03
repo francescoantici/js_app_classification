@@ -1,0 +1,29 @@
+{
+    "description": "This job script executes a Transformer-based neural ODE training task using JAX on a GPU cluster with 4 nodes, each running a single task with 48 CPUs and 8 A100 GPUs. The training is configured with 24 layers, gradient checkpointing, and a batch size of 64. The environment variables JAX_PLATFORM_NAME=tpu and TPU_VISIBLE_DEVICES=0,1,2,3 are set, suggesting the use of TPU devices.",
+    "domain": "ai",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_jax_tpu.py",
+                "parameters": [
+                    "--model=transformer",
+                    "--layers=24",
+                    "--checkpoint_gradients",
+                    "--batch-size=64"
+                ],
+                "step_description": "Executes the JAX training script for a transformer neural ODE with 24 layers, gradient checkpointing, and batch size 64, using environment variables to configure JAX for TPU platform and device visibility."
+            }
+        }
+    ]
+}

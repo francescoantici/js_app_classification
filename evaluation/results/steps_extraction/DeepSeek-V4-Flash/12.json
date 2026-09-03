@@ -1,0 +1,36 @@
+{
+    "description": "Spark job for cybersecurity threat detection using log processing on a big data cluster.",
+    "domain": [
+        "cybersecurity",
+        "data science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "process_logs.py",
+                "parameters": [
+                    "--master yarn",
+                    "--deploy-mode cluster",
+                    "--executor-memory 32G",
+                    "--num-executors 50",
+                    "--conf spark.executor.cores=8",
+                    "--input s3a://logs/2024/",
+                    "--output hdfs://analytics/cybersecurity/",
+                    "--algorithm=threat_detection"
+                ],
+                "step_description": "Submits a Spark job to process log data for cybersecurity threat detection using a Python script."
+            }
+        }
+    ]
+}

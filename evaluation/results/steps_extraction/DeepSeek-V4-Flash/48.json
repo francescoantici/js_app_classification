@@ -1,0 +1,29 @@
+{
+    "description": "Trains a Stable Diffusion model for DreamBooth personalization using a containerized PyTorch environment on multiple GPUs.",
+    "domain": "ai",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "apptainer"
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_dreambooth.py",
+                "parameters": [
+                    "--pretrained_model_name_or_path runwayml/stable-diffusion-v1-5",
+                    "--instance_data_dir=/data/art_style",
+                    "--output_dir=/models/dreambooth",
+                    "--resolution=512"
+                ],
+                "step_description": "Runs DreamBooth training script inside an Apptainer container with GPU support."
+            }
+        }
+    ]
+}

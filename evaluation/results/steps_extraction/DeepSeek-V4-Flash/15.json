@@ -1,0 +1,29 @@
+{
+    "description": "This job script submits a 16-node Slurm job to run DeepSpeed-based GPT-3 training on 8 A100 GPUs per node. It uses an Apptainer container with the DeepSpeed framework to execute a Python training script with Zero-3 optimization and gradient accumulation.",
+    "domain": "ai",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "apptainer"
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "deepspeed",
+                "executed_file": "train_gpt3_deepspeed.py",
+                "parameters": [
+                    "--deepspeed_config ds_config.json",
+                    "--zero-stage=3",
+                    "--gradient-accumulation-steps=8",
+                    "--batch-size-per-gpu=4"
+                ],
+                "step_description": "Executes the GPT-3 training script using DeepSpeed inside an Apptainer container, with a DeepSpeed configuration, Zero-3 optimization, gradient accumulation across 8 steps, and a batch size of 4 per GPU."
+            }
+        }
+    ]
+}

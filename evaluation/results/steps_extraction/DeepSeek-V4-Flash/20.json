@@ -1,0 +1,32 @@
+{
+    "description": "This job runs an Amber molecular dynamics simulation on a GPU partition. It loads the Amber 22 module and executes pmemd.cuda with input files for a DNA-protein system.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Amber",
+                "executed_file": null,
+                "parameters": [
+                    "-O",
+                    "-i md.in",
+                    "-o md.out",
+                    "-p dna_protein.prmtop",
+                    "-c md.rst",
+                    "-r md_final.rst",
+                    "-x md.nc"
+                ],
+                "step_description": "Runs the Amber pmemd.cuda molecular dynamics simulation with the provided input, topology, restart, and output files."
+            }
+        }
+    ]
+}

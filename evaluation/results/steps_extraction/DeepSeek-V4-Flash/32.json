@@ -1,0 +1,29 @@
+{
+    "description": "Run a Nextflow proteomics pipeline with Docker containers, processing raw mass spectrometry files, a FASTA database, and MaxQuant parameters.",
+    "domain": "biology",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "nextflow"
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "docker"
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "nextflow",
+                "executed_file": "proteomics.nf",
+                "parameters": [
+                    "-with-docker",
+                    "--raw_files 'raw/*.raw'",
+                    "--fasta uniprot_human.fasta",
+                    "--mqpar maxquant_parameters.xml"
+                ],
+                "step_description": "Execute Nextflow workflow proteomics.nf with Docker, specifying raw files, FASTA database, and MaxQuant parameters."
+            }
+        }
+    ]
+}

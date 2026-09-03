@@ -1,0 +1,106 @@
+{
+    "description": "This job script runs a photonic waveguide coupler FDTD simulation using Meep across an array of design parameters. It generates a design table, runs simulations with MPI, and extracts transmission data.",
+    "domain": [
+        "physics",
+        "photonics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load openmpi/4.1.5",
+                    "module load meep/1.28-mpi",
+                    "module load h5utils/1.13.1"
+                ],
+                "step_description": "Loads required modules and sets up environment."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "python3",
+                "executed_file": "inline script",
+                "parameters": [
+                    "generate_designs"
+                ],
+                "step_description": "Generates design table using Python if not already present."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "meep",
+                "executed_file": "waveguide_coupler.py",
+                "parameters": [
+                    "--gap-nm",
+                    "$GAP",
+                    "--width-nm",
+                    "$WIDTH",
+                    "--taper-length-um",
+                    "$TAPER",
+                    "--resolution",
+                    "40",
+                    "--output-dir",
+                    "$RESULT_DIR",
+                    "--until-after-sources",
+                    "200"
+                ],
+                "step_description": "Runs Meep FDTD simulation for the current design using MPI."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python3",
+                "executed_file": "extract_transmission.py",
+                "parameters": [
+                    "--flux-file",
+                    "${RESULT_DIR}/flux_data.h5",
+                    "--output",
+                    "${RESULT_DIR}/coupling_efficiency.json"
+                ],
+                "step_description": "Extracts transmission data from HDF5 flux file and outputs coupling efficiency."
+            }
+        }
+    ]
+}

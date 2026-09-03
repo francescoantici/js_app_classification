@@ -1,0 +1,218 @@
+{
+    "description": "Array job simulating tsunami hazards from Cascadia rupture scenarios using GeoClaw, from catalog generation to hazard extraction.",
+    "domain": [
+        "earth science",
+        "natural hazards",
+        "geophysics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load python/3.11",
+                    "module load geoclaw/5.10.0",
+                    "SCENARIO_TABLE=rupture_scenarios.tsv",
+                    "TASK_ID=$SLURM_ARRAY_TASK_ID",
+                    "mkdir -p logs results"
+                ],
+                "step_description": "Load environment modules and set up directories and task variables."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "python",
+                "executed_file": "generate_rupture_catalog.py",
+                "parameters": [
+                    "--fault-zone cascadia",
+                    "--n-scenarios 60",
+                    "--output rupture_scenarios.tsv"
+                ],
+                "step_description": "Generate rupture scenario catalog if it does not exist."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "for i in {1..20}; do",
+                    "[ -f rupture_scenarios.tsv ] && break",
+                    "sleep 3",
+                    "done"
+                ],
+                "step_description": "Wait for the scenario table to be created."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "LINE=$((TASK_ID + 1))",
+                    "read -r ID MAG LAT LON STRIKE DIP RAKE <<< \"$(sed -n \"${LINE}p\" \"$SCENARIO_TABLE\")\"",
+                    "SCENARIO_DIR=\"results/scenario_${ID}\"",
+                    "mkdir -p \"$SCENARIO_DIR\"",
+                    "cd \"$SCENARIO_DIR\""
+                ],
+                "step_description": "Parse scenario parameters from table and prepare scenario directory."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "python",
+                "executed_file": "compute_okada_deformation.py",
+                "parameters": [
+                    "--magnitude \"$MAG\"",
+                    "--lat \"$LAT\"",
+                    "--lon \"$LON\"",
+                    "--strike \"$STRIKE\"",
+                    "--dip \"$DIP\"",
+                    "--rake \"$RAKE\"",
+                    "--output dtopo.tt3"
+                ],
+                "step_description": "Compute seafloor deformation using Okada model to create tsunami initial condition."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "cp ../../setrun_template.py setrun.py",
+                    "cp ../../setplot.py .",
+                    "sed -i \"s/@DTOPO_FILE@/dtopo.tt3/\" setrun.py"
+                ],
+                "step_description": "Copy and configure GeoClaw setrun and setplot scripts."
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "geoclaw",
+                "executed_file": "run_geoclaw.py",
+                "parameters": [
+                    "--setrun setrun.py",
+                    "--output-dir _output",
+                    "--num-threads \"$SLURM_CPUS_PER_TASK\""
+                ],
+                "step_description": "Run GeoClaw tsunami simulation for the scenario."
+            }
+        },
+        {
+            "step_id": 8,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "extract_gauge_hazard.py",
+                "parameters": [
+                    "--output-dir _output",
+                    "--gauges ../../coastal_gauges.txt",
+                    "--result \"hazard_summary_${ID}.json\""
+                ],
+                "step_description": "Extract hazard metrics at coastal gauges and save summary JSON."
+            }
+        },
+        {
+            "step_id": 9,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "echo \"Scenario $ID done at $(date)\"",
+                    "cd ../.."
+                ],
+                "step_description": "Log completion and return to root directory."
+            }
+        }
+    ]
+}

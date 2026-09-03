@@ -1,0 +1,29 @@
+{
+    "description": "Run an ensemble of lattice QCD HMC trajectories using Chroma on multiple GPUs, resubmitting itself until target number of configurations is reached.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "chroma",
+                "executed_file": null,
+                "parameters": [
+                    "-geom 2 2 2 4",
+                    "-i hmc_segment.xml",
+                    "-o hmc_segment_${START_TRAJ}_${END_TRAJ}.xml.out",
+                    "-qmp-geom 2 2 2 4"
+                ],
+                "step_description": "Run lattice QCD HMC simulation using Chroma on GPU nodes, generating a segment of gauge field configurations."
+            }
+        }
+    ]
+}

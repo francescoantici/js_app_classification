@@ -1,0 +1,79 @@
+{
+    "description": "This job script sets up a three-stage quantum espresso pipeline: an SCF ground state calculation, a DFPT phonon calculation that depends on the SCF result, and post-processing of dynamical matrices into phonon DOS and dispersion, all submitted via Slurm's sbatch with job dependencies.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Quantum ESPRESSO",
+                "executed_file": null,
+                "parameters": [
+                    "-npool",
+                    "4",
+                    "-in",
+                    "scf.in",
+                    ">",
+                    "scf.out"
+                ],
+                "step_description": "Run a Quantum ESPRESSO SCF ground state calculation using pw.x with 32 MPI tasks with 4 pools, outputting to scf.out and checking for convergence."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Quantum ESPRESSO",
+                "executed_file": null,
+                "parameters": [
+                    "-npool",
+                    "8",
+                    "-in",
+                    "phonon.in",
+                    ">",
+                    "phonon.out"
+                ],
+                "step_description": "Run a DFPT phonon calculation using ph.x with 128 MPI tasks in 8 pools, resuming from recover files if present, and optionally resubmitting itself if the run is incomplete."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Quantum ESPRESSO",
+                "executed_file": null,
+                "parameters": [
+                    "<",
+                    "q2r.in",
+                    ">",
+                    "q2r.out"
+                ],
+                "step_description": "Run q2r.x to convert dynamical matrices to force constants and then matdyn.x to generate phonon dispersion and DOS."
+            }
+        }
+    ]
+}

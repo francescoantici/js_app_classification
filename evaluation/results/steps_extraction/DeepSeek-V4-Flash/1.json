@@ -1,0 +1,37 @@
+{
+    "description": "Run a GROMACS membrane simulation using GPU resources via Apptainer container.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "apptainer"
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "gmx",
+                "executed_file": null,
+                "parameters": [
+                    "mdrun",
+                    "-v",
+                    "-deffnm",
+                    "md_membrane",
+                    "-ntomp",
+                    "8",
+                    "-nb",
+                    "gpu",
+                    "-bonded",
+                    "gpu",
+                    "-pme",
+                    "gpu"
+                ],
+                "step_description": "Execute GROMACS mdrun inside an Apptainer container with GPU acceleration for a membrane simulation."
+            }
+        }
+    ]
+}

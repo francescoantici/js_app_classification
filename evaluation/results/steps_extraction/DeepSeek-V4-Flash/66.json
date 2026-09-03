@@ -1,0 +1,98 @@
+{
+    "description": "This job script sets up and runs an OpenFOAM computational fluid dynamics (CFD) simulation of an airfoil case using a Slurm cluster. It loads the necessary modules, decomposes the case, optionally generates the mesh, runs the solver in parallel, reconstructs the case, and post-processes force coefficients.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "module purge",
+                    "module load openmpi/4.1.5",
+                    "module load openfoam/v2312",
+                    "source ${WM_PROJECT_DIR}/etc/bashrc",
+                    "NTOTAL=$((SLURM_NNODES * SLURM_NTASKS_PER_NODE))",
+                    "sed -i \"s/numberOfSubdomains.*/numberOfSubdomains ${NTOTAL};/\" system/decomposeParDict"
+                ],
+                "step_description": "Prepare the environment by loading modules, setting variables, and updating the decomposition dictionary."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "OpenFOAM",
+                "executed_file": null,
+                "parameters": [
+                    "blockMesh",
+                    "decomposePar",
+                    "snappyHexMesh -parallel -overwrite",
+                    "reconstructParMesh -constant",
+                    "-n $NTOTAL"
+                ],
+                "step_description": "Generate the computational mesh using blockMesh, snappyHexMesh in parallel, and reconstruct the mesh. This step is conditional on the absence of an existing mesh."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "OpenFOAM",
+                "executed_file": null,
+                "parameters": [
+                    "checkMesh",
+                    "decomposePar -force",
+                    "simpleFoam -parallel"
+                ],
+                "step_description": "Run mesh quality checks, decompose the case for parallel processing, execute the simpleFoam solver in parallel, and reconstruct the results."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "OpenFOAM",
+                "executed_file": null,
+                "parameters": [
+                    "reconstructPar -latestTime",
+                    "postProcess -func forceCoeffs -latestTime"
+                ],
+                "step_description": "Reconstruct the latest time step and post-process force coefficients using OpenFOAM utilities."
+            }
+        }
+    ]
+}

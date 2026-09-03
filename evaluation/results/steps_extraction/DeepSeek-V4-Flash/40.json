@@ -1,0 +1,33 @@
+{
+    "description": "Run a single-cell RNA sequencing (scRNA-seq) analysis pipeline using Nextflow with the Apptainer container engine, processing input samplesheet and genome GRCh38 with 10x protocol.",
+    "domain": [
+        "bioinformatics",
+        "genomics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "nextflow"
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "apptainer"
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "nextflow",
+                "executed_file": "scrnaseq_pipeline.nf",
+                "parameters": [
+                    "-profile apptainer",
+                    "--input samplesheet.csv",
+                    "--genome GRCh38",
+                    "--protocol 10x",
+                    "--outdir results/"
+                ],
+                "step_description": "Load Nextflow module and execute the scRNA-seq pipeline with Apptainer, providing input samplesheet, genome, protocol, and output directory parameters."
+            }
+        }
+    ]
+}

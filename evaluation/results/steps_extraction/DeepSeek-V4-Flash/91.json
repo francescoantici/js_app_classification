@@ -1,0 +1,94 @@
+{
+    "description": "Phase-field solidification simulation of Al-Cu dendrite growth using GPU resources, with checkpoint restart logic, post-processing analysis, and conditional job resubmission.",
+    "domain": [
+        "materials science",
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "phasefield_solver",
+                "executed_file": "./phasefield_solver",
+                "parameters": [
+                    "--grid",
+                    "2048 2048",
+                    "--dx",
+                    "0.5e-6",
+                    "--dt-adaptive",
+                    "--model",
+                    "kim_kim_suzuki",
+                    "--alloy",
+                    "Al-Cu",
+                    "--seed-nucleus",
+                    "planar",
+                    "--undercooling",
+                    "20.0",
+                    "--composition",
+                    "0.04",
+                    "--run-time-seconds",
+                    "5.0",
+                    "--output-dir",
+                    "microstructure",
+                    "--checkpoint-every",
+                    "500"
+                ],
+                "step_description": "Run the phase-field solidification simulation with GPU acceleration, using a planar seed nucleus and specified undercooling and composition."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_dendrite_morphology.py",
+                "parameters": [
+                    "--state-file",
+                    "microstructure/state_t*.h5",
+                    "--output",
+                    "microstructure/morphology_metrics.json"
+                ],
+                "step_description": "Analyze the dendrite morphology from the latest state file to produce morphology metrics."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "extract tip velocity and liquid fraction from metrics JSON",
+                    "conditionally resubmit job if liquid fraction > 0.05",
+                    "output status messages"
+                ],
+                "step_description": "Extract tip velocity and liquid fraction from metrics, log results, and conditionally resubmit the job for continuation if solidification is incomplete."
+            }
+        }
+    ]
+}

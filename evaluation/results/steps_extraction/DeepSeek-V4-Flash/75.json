@@ -1,0 +1,151 @@
+{
+    "description": "This job script runs a FLASH AMR simulation for a core-collapse supernova (ccsn) on an HPC cluster using SLURM. It restarts from the latest checkpoint if available, runs the FLASH4 executable, monitors progress via a post-bounce time extraction, and resubmits itself if the target time is not reached. If the target is reached, it runs explosion diagnostics.",
+    "domain": [
+        "astrophysics",
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs",
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load openmpi/4.1.5",
+                    "module load hdf5/1.14.0-mpi",
+                    "module load hypre/2.29.0",
+                    "CASE_DIR=/projects/myuser/flash/ccsn_15Msun",
+                    "cd $CASE_DIR",
+                    "TARGET_POSTBOUNCE_MS=500",
+                    "echo === FLASH AMR segment: $(date) ===",
+                    "checkpoint_handler() { ... }",
+                    "trap checkpoint_handler USR1",
+                    "LATEST_CHK=$(ls -v ccsn_hdf5_chk_* 2>/dev/null | tail -n1 || true)"
+                ],
+                "step_description": "Sets up the job environment, loads necessary modules, changes to the case directory, sets the target post-bounce time, and installs a signal handler for checkpoint dumping. It also determines the latest checkpoint file for potential restart."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "LATEST_CHK=$(ls -v ccsn_hdf5_chk_* 2>/dev/null | tail -n1 || true)",
+                    "if [ -n \"$LATEST_CHK\" ]; then ... else ... fi"
+                ],
+                "step_description": "Checks if a previous checkpoint exists. If so, modifies the FLASH parameter file to restart from that checkpoint; otherwise, sets it to start fresh from the progenitor model."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "FLASH",
+                "executed_file": "./flash4",
+                "parameters": [
+                    "--mpi=pmix",
+                    "-par_file",
+                    "flash.par"
+                ],
+                "step_description": "Executes the FLASH AMR simulation using MPI (srun) with the specified parameter file. The process is run in the background and its PID is captured. The script waits for this process to finish."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "extract_postbounce_time.py",
+                "parameters": [
+                    "--checkpoint",
+                    "$LATEST_CHK"
+                ],
+                "step_description": "Extracts the post-bounce time from the latest checkpoint using a Python script (extract_postbounce_time.py). The value is used to decide whether to continue or finalize the simulation."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "POSTBOUNCE_MS=$(",
+                    "LATEST_CHK=$(ls -v ccsn_hdf5_chk_* | tail -n1)",
+                    "rm -f dump_forced",
+                    "if awk -v c=\"$POSTBOUNCE_MS\" -v t=\"$TARGET_POSTBOUNCE_MS\" 'BEGIN{exit !(c < t)}'; then ... else ... fi"
+                ],
+                "step_description": "Checks whether the extracted post-bounce time is less than the target. If so, it resubmits the same job script to continue the simulation; otherwise, it proceeds to run explosion diagnostics. It also removes the forced dump file if present."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_explosion_energetics.py",
+                "parameters": [
+                    "--checkpoint-dir",
+                    ".",
+                    "--output",
+                    "analysis/explosion_diagnostics.json"
+                ],
+                "step_description": "If the target post-bounce time is reached, runs a Python script to analyze the explosion energetics and save diagnostics to a JSON file."
+            }
+        }
+    ]
+}

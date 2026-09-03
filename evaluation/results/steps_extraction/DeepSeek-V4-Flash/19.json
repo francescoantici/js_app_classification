@@ -1,0 +1,31 @@
+{
+    "description": "Run distributed PyTorch training with Horovod using singularity container on GPU nodes.",
+    "domain": [
+        "ai_ml"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "singularity"
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "train_hvd_torch.py",
+                "parameters": [
+                    "--use-adasum",
+                    "--fp16-allreduce",
+                    "--data-dir /imagenet",
+                    "--epochs=90"
+                ],
+                "step_description": "Execute Horovod-run distributed training of PyTorch model inside Singularity container, using 8 processes across 4 nodes."
+            }
+        }
+    ]
+}

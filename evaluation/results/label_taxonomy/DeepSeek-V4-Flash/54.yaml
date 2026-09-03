@@ -1,0 +1,12 @@
+orchestration:
+  type: job_array
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: GATK
+  target_executable: gatk
+  workload_category: bioinformatics
+compute_profile:
+- task_farming

@@ -1,0 +1,109 @@
+{
+    "description": "An active learning loop that iteratively trains multiple DeePMD models, runs molecular dynamics exploration with uncertainty flagging, and labels selected frames using DFT calculations.",
+    "domain": [
+        "materials science",
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs training_data models exploration labeled",
+                    "N_ROUNDS=8",
+                    "N_MODELS=4"
+                ],
+                "step_description": "Sets up directory structure and defines configuration variables for the active learning loop."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "DeePMD-kit",
+                "executed_file": null,
+                "parameters": [
+                    "--init-model-seed ${MODEL_ID}",
+                    "../../../input_template.json",
+                    "--output model.pb",
+                    "SLURM_ARRAY_TASK_ID",
+                    "PBS_ARRAY_INDEX"
+                ],
+                "step_description": "Submits a job array for training multiple DeePMD models in parallel on GPU nodes."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "LAMMPS",
+                "executed_file": null,
+                "parameters": [
+                    "-k on g 1",
+                    "-sf kk",
+                    "-in ../../explore_md_template.in",
+                    "-log explore.log",
+                    "python3 ../../flag_high_uncertainty_frames.py",
+                    "--dump-file dump.explore",
+                    "--models model_1.pb model_2.pb model_3.pb model_4.pb",
+                    "--uncertainty-threshold 0.15",
+                    "--output flagged_frames.xyz"
+                ],
+                "step_description": "Runs molecular dynamics exploration using the trained models and flags high-uncertainty frames for labeling."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "VASP",
+                "executed_file": null,
+                "parameters": [
+                    "python3 run_dft_labeling.py",
+                    "--frames exploration/round_${ROUND}/flagged_frames.xyz",
+                    "--output-dir labeled/round_${ROUND}",
+                    "--mpi-command 'srun --mpi=pmi2 -n 64 vasp_std'",
+                    "python3 merge_into_training_set.py",
+                    "--new-labels labeled/round_${ROUND}",
+                    "--dataset training_data/current_dataset.json"
+                ],
+                "step_description": "Runs DFT labeling on flagged frames and merges the newly labeled data into the training dataset."
+            }
+        }
+    ]
+}

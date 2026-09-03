@@ -1,0 +1,12 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: sbatch
+execution_environment:
+  type: bare_metal
+  tool_detected: module load intel, intel-mpi, cp2k, python
+workload:
+  primary_software: CP2K
+  target_executable: cp2k.psmp
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

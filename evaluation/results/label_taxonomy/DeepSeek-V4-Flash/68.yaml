@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: custom_binary
+  target_executable: fwi_driver
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

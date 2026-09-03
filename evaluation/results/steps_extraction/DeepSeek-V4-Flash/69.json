@@ -1,0 +1,101 @@
+{
+    "description": "This script submits a two-stage HPC job to predict protein structure using AlphaFold. The first stage performs multiple sequence alignment (MSA) searches using JackHMMER and HHblits on CPU, and the second stage runs AlphaFold structure inference and relaxation on GPU, dependent on the first stage's success.",
+    "domain": [
+        "biology",
+        "structural biology"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "sbatch"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs",
+                    "FASTA_FILE=${1:?Usage: $0 <fasta_file>}",
+                    "TARGET_NAME=$(basename \"$FASTA_FILE\" .fasta)",
+                    "echo \"=== Stage 1: MSA search (CPU, high I/O) for $TARGET_NAME ===\"",
+                    "MSA_JOBID=$(sbatch --parsable --job-name=\"msa_${TARGET_NAME}\" --partition=compute --cpus-per-task=32 --mem=120G --time=08:00:00 --output=logs/%x_%j.out --error=logs/%x_%j.err --wrap=\"set -euo pipefail\nmodule load hmmer/3.4\nmodule load hhsuite/3.3.0\nmodule load jackhmmer/3.4\nmkdir -p msa_output/${TARGET_NAME}\njackhmmer -N 3 --cpu 32 -A msa_output/${TARGET_NAME}/uniref90_hits.sto ${FASTA_FILE} /databases/uniref90/uniref90.fasta\njackhmmer -N 3 --cpu 32 -A msa_output/${TARGET_NAME}/mgnify_hits.sto ${FASTA_FILE} /databases/mgnify/mgy_clusters.fasta\nhhblits -cpu 32 -i ${FASTA_FILE} -d /databases/bfd/bfd_metaclust -oa3m msa_output/${TARGET_NAME}/bfd_hits.a3m -n 3\n\")",
+                    "echo \"MSA job submitted: $MSA_JOBID\""
+                ],
+                "step_description": "Set up directories and submit the MSA search job as a Slurm batch script."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "sbatch"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "jackhmmer",
+                "executed_file": null,
+                "parameters": [
+                    "-N 3 --cpu 32 -A msa_output/${TARGET_NAME}/uniref90_hits.sto ${FASTA_FILE} /databases/uniref90/uniref90.fasta",
+                    "-N 3 --cpu 32 -A msa_output/${TARGET_NAME}/mgnify_hits.sto ${FASTA_FILE} /databases/mgnify/mgy_clusters.fasta"
+                ],
+                "step_description": "Run JackHMMER searches against UniRef90 and MGnify databases to generate MSA files."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "sbatch"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "hhblits",
+                "executed_file": null,
+                "parameters": [
+                    "-cpu 32 -i ${FASTA_FILE} -d /databases/bfd/bfd_metaclust -oa3m msa_output/${TARGET_NAME}/bfd_hits.a3m -n 3"
+                ],
+                "step_description": "Run HHblits search against BFD database to generate a3m MSA file."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "sbatch"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "alphafold",
+                "executed_file": "run_alphafold.py",
+                "parameters": [
+                    "--fasta_paths=${FASTA_FILE}",
+                    "--msa_dir=msa_output/${TARGET_NAME}",
+                    "--model_preset=monomer_ptm",
+                    "--num_multimer_predictions_per_model=1",
+                    "--use_gpu_relax=true",
+                    "--max_template_date=2024-01-01",
+                    "--output_dir=predictions/${TARGET_NAME}"
+                ],
+                "step_description": "Submit and run AlphaFold structure prediction with GPU acceleration, then print the ranking results from the JSON output."
+            }
+        }
+    ]
+}

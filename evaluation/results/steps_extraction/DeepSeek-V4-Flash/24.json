@@ -1,0 +1,30 @@
+{
+    "description": "ChIP-seq pipeline execution using Snakemake workflow manager, submitting jobs to Slurm cluster.",
+    "domain": "genomics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "snakemake"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "snakemake",
+                "executed_file": null,
+                "parameters": [
+                    "-j 100",
+                    "--cluster-config cluster.json",
+                    "--cluster 'sbatch --mem={cluster.mem} --time={cluster.time}'",
+                    "--use-conda",
+                    "--latency-wait 60"
+                ],
+                "step_description": "Loads Snakemake module and submits workflow tasks to the Slurm scheduler."
+            }
+        }
+    ]
+}

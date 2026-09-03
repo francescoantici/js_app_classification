@@ -1,0 +1,117 @@
+{
+    "description": "Cryo-EM 3D classification, refinement, and post-processing pipeline using RELION with GPU acceleration",
+    "domain": [
+        "biology",
+        "structural biology"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "RELION",
+                "executed_file": null,
+                "parameters": [
+                    "--auto_refine",
+                    "--split_random_halves",
+                    "--i particles_selected.star",
+                    "--ref reference_map.mrc",
+                    "--firstiter_cc",
+                    "--ini_high 40",
+                    "--dont_combine_weights_via_disc",
+                    "--pool 30",
+                    "--pad 2",
+                    "--ctf",
+                    "--particle_diameter 300",
+                    "--flatten_solvent",
+                    "--zero_mask",
+                    "--oversampling 1",
+                    "--healpix_order 2",
+                    "--auto_local_healpix_order 4",
+                    "--offset_range 5",
+                    "--offset_step 2",
+                    "--sym C1",
+                    "--low_resol_join_halves 40",
+                    "--norm",
+                    "--scale",
+                    "--j $SLURM_CPUS_PER_TASK",
+                    "--gpu"
+                ],
+                "step_description": "Runs RELION MPI 3D classification with GPU acceleration."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "RELION",
+                "executed_file": null,
+                "parameters": [
+                    "--auto_refine",
+                    "--split_random_halves",
+                    "--i Class3D/job010/best_class_particles.star",
+                    "--ref Class3D/job010/run_class001.mrc",
+                    "--firstiter_cc",
+                    "--ini_high 20",
+                    "--ctf",
+                    "--particle_diameter 300",
+                    "--flatten_solvent",
+                    "--zero_mask",
+                    "--oversampling 1",
+                    "--healpix_order 2",
+                    "--auto_local_healpix_order 4",
+                    "--offset_range 5",
+                    "--offset_step 2",
+                    "--sym C1",
+                    "--low_resol_join_halves 40",
+                    "--norm",
+                    "--scale",
+                    "--j $SLURM_CPUS_PER_TASK",
+                    "--gpu"
+                ],
+                "step_description": "Runs RELION MPI 3D auto-refinement with GPU acceleration."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "RELION",
+                "executed_file": null,
+                "parameters": [
+                    "--i Refine3D/job020/run_half1_class001_unfil.mrc",
+                    "--i2 Refine3D/job020/run_half2_class001_unfil.mrc",
+                    "--o PostProcess/job030/postprocess",
+                    "--mask solvent_mask.mrc",
+                    "--auto_bfac",
+                    "--autob_lowres 10"
+                ],
+                "step_description": "Runs RELION post-processing to apply mask, estimate B-factor, and calculate final resolution."
+            }
+        }
+    ]
+}

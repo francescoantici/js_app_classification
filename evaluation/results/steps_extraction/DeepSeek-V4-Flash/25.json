@@ -1,0 +1,32 @@
+{
+    "description": "Run a financial market data analysis script using Python with pandas environment.",
+    "domain": [
+        "data science",
+        "finance"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_market_data.py",
+                "parameters": [
+                    "--symbols AAPL,GOOGL,MSFT",
+                    "--start-date=2020-01-01",
+                    "--window-size=30",
+                    "--output=metrics.csv"
+                ],
+                "step_description": "Activate Python environment and run the market data analysis script with specified parameters."
+            }
+        }
+    ]
+}

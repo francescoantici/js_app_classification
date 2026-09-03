@@ -1,0 +1,53 @@
+{
+    "description": "Run a NEST cortical microcircuit simulation using MPI and OpenMP parallelization, then analyze the population firing rates and generate a raster plot.",
+    "domain": [
+        "neuroscience"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "NEST Simulator",
+                "executed_file": null,
+                "parameters": [
+                    "sim_config.py"
+                ],
+                "step_description": "Run the NEST cortical microcircuit simulation with MPI processes and threads per process, using the configuration file sim_config.py."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_network_activity.py",
+                "parameters": [
+                    "--spikes-dir",
+                    "spikes",
+                    "--output",
+                    "analysis/population_firing_rates.json",
+                    "--raster-plot",
+                    "analysis/raster_plot.png"
+                ],
+                "step_description": "Analyze the spike output to compute population firing rates and generate a raster plot."
+            }
+        }
+    ]
+}

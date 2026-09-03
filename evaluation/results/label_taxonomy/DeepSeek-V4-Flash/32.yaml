@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: nextflow
+execution_environment:
+  type: containerized
+  tool_detected: docker
+workload:
+  primary_software: MaxQuant
+  target_executable: proteomics.nf
+  workload_category: bioinformatics
+compute_profile: []

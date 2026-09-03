@@ -1,0 +1,30 @@
+{
+    "description": "Transfer experimental data from an instrument lab to scratch storage using Abyss, with checksum verification and bandwidth limiting.",
+    "domain": "data science",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "abyss",
+                "executed_file": null,
+                "parameters": [
+                    "scp://instrument.lab/data/*",
+                    "/scratch/experiment_$(date +%Y%m%d)/",
+                    "--bandwidth=10G",
+                    "--checksum=sha256",
+                    "--verbose"
+                ],
+                "step_description": "Transfer files from remote instrument to local scratch directory using Abyss with SHA256 checksum and bandwidth limit."
+            }
+        }
+    ]
+}

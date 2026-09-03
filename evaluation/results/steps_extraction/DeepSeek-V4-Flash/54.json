@@ -1,0 +1,168 @@
+{
+    "description": "This job script performs a germline variant calling pipeline on 24 samples using an array job. Each task aligns reads with BWA-MEM, marks duplicates with Picard, performs base quality score recalibration (BQSR) with GATK, calls variants with HaplotypeCaller to produce gVCF files, and collects QC metrics.",
+    "domain": [
+        "genomics",
+        "bioinformatics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "bwa",
+                "executed_file": null,
+                "parameters": [
+                    "mem",
+                    "-t",
+                    "16",
+                    "-R",
+                    "@RG\\tID:${SAMPLE_ID}\\tSM:${SAMPLE_ID}\\tPL:ILLUMINA",
+                    "$REF",
+                    "$FASTQ_R1",
+                    "$FASTQ_R2"
+                ],
+                "step_description": "Aligns paired-end reads to the reference genome using BWA-MEM and pipes to samtools sort to produce a sorted BAM file."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "picard",
+                "executed_file": null,
+                "parameters": [
+                    "MarkDuplicates",
+                    "I=${SAMPLE_TMP}/aligned.sorted.bam",
+                    "O=${SAMPLE_TMP}/dedup.bam",
+                    "M=${SAMPLE_TMP}/dup_metrics.txt"
+                ],
+                "step_description": "Marks duplicate reads using Picard MarkDuplicates and creates an index for the deduplicated BAM file."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "gatk",
+                "executed_file": null,
+                "parameters": [
+                    "BaseRecalibrator",
+                    "-I",
+                    "${SAMPLE_TMP}/dedup.bam",
+                    "-R",
+                    "$REF",
+                    "--known-sites",
+                    "$KNOWN_SITES",
+                    "-O",
+                    "${SAMPLE_TMP}/recal.table"
+                ],
+                "step_description": "Generates a recalibration table for base quality score recalibration using GATK BaseRecalibrator."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "gatk",
+                "executed_file": null,
+                "parameters": [
+                    "ApplyBQSR",
+                    "-I",
+                    "${SAMPLE_TMP}/dedup.bam",
+                    "-R",
+                    "$REF",
+                    "--bqsr-recal-file",
+                    "${SAMPLE_TMP}/recal.table",
+                    "-O",
+                    "${SAMPLE_TMP}/recal.bam"
+                ],
+                "step_description": "Applies base quality score recalibration to the deduplicated BAM file using GATK ApplyBQSR."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "gatk",
+                "executed_file": null,
+                "parameters": [
+                    "HaplotypeCaller",
+                    "-I",
+                    "${SAMPLE_TMP}/recal.bam",
+                    "-R",
+                    "$REF",
+                    "-O",
+                    "results/${SAMPLE_ID}/${SAMPLE_ID}.g.vcf.gz",
+                    "-ERC",
+                    "GVCF",
+                    "--native-pair-hmm-threads",
+                    "16"
+                ],
+                "step_description": "Calls germline variants using GATK HaplotypeCaller in GVCF mode to produce a gVCF file."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "samtools",
+                "executed_file": null,
+                "parameters": [
+                    "flagstat",
+                    "${SAMPLE_TMP}/recal.bam",
+                    ">",
+                    "results/${SAMPLE_ID}/flagstat.txt"
+                ],
+                "step_description": "Collects QC metrics: runs samtools flagstat to output alignment statistics and computes mean depth using samtools depth and awk."
+            }
+        }
+    ]
+}

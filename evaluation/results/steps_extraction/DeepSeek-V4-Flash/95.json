@@ -1,0 +1,64 @@
+{
+    "description": "This job script submits a task array to SLURM that performs uncertainty quantification (UQ) using Sobol sampling. It generates input samples, runs a thermal-structural model, and saves results.",
+    "domain": "engineering",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [
+                    "from scipy.stats import qmc",
+                    "import numpy as np",
+                    "sampler = qmc.Sobol(d=4, scramble=True, seed=42)",
+                    "samples = sampler.random_base2(m=8)",
+                    "bounds = { \"k\": (0.5, 5.0), \"E\": (150e9, 250e9), \"t\": (1.0, 10.0), \"T\": (20, 150) }",
+                    "scaled = qmc.scale(samples, [b[0] for b in bounds.values()], [b[1] for b in bounds.values()])",
+                    "with open(\"sobol_samples.tsv\", \"w\") as f:",
+                    "f.write(\"id\\tthermal_conductivity\\tyoungs_modulus\\tthickness_mm\\tbc_temp_c\\n\")",
+                    "for i, row in enumerate(scaled, start=1):",
+                    "f.write(f\"{i}\\t{row[0]:.4f}\\t{row[1]:.4e}\\t{row[2]:.4f}\\t{row[3]:.2f}\\n\")"
+                ],
+                "step_description": "Generate Sobol samples using scipy and write to a TSV file if task ID is 1 and file does not exist."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "python",
+                "executed_file": "thermal_structural_model.py",
+                "parameters": [
+                    "--conductivity",
+                    "$K",
+                    "--youngs-modulus",
+                    "$E",
+                    "--thickness-mm",
+                    "$T_MM",
+                    "--bc-temp-c",
+                    "$BC_TEMP",
+                    "--output",
+                    "results/sample_${ID}.json"
+                ],
+                "step_description": "Run the thermal-structural model for each task array sample, passing parameters from the generated TSV file."
+            }
+        }
+    ]
+}

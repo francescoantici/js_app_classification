@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: snakemake
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: snakemake
+  target_executable: null
+  workload_category: bioinformatics
+compute_profile: []

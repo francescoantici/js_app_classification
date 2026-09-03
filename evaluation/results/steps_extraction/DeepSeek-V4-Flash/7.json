@@ -1,0 +1,34 @@
+{
+    "description": "Run a Snakemake workflow for variant calling with specified resources and conda environment management.",
+    "domain": "bioinformatics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "snakemake"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "snakemake",
+                "executed_file": null,
+                "parameters": [
+                    "--cores",
+                    "24",
+                    "--configfile",
+                    "config.yaml",
+                    "--use-conda",
+                    "--conda-prefix",
+                    "/opt/conda_envs",
+                    "--latency-wait",
+                    "60"
+                ],
+                "step_description": "Execute the Snakemake workflow with specified cores, config file, and conda environment settings."
+            }
+        }
+    ]
+}

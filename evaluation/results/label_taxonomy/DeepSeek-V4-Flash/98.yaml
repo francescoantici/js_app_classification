@@ -1,0 +1,13 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: conda
+workload:
+  primary_software: DeepMD-kit
+  target_executable: dp train
+  workload_category: ai_ml
+compute_profile:
+- mpi
+- task_farming

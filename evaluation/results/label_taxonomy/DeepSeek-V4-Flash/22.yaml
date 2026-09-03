@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: nextflow
+execution_environment:
+  type: containerized
+  tool_detected: apptainer
+workload:
+  primary_software: metagenomics_pipeline.nf
+  target_executable: metagenomics_pipeline.nf
+  workload_category: bioinformatics
+compute_profile: []

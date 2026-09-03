@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: apptainer
+workload:
+  primary_software: GROMACS
+  target_executable: null
+  workload_category: simulation_modeling
+compute_profile:
+- openmp

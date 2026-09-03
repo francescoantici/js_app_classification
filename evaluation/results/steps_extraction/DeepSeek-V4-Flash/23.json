@@ -1,0 +1,29 @@
+{
+    "description": "Event processing job that runs a custom shell script to process events with calibration and multithreading on a CPU partition.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "shell",
+                "executed_file": "process_events.sh",
+                "parameters": [
+                    "--input=/data/raw/events.root",
+                    "--output=/data/processed/",
+                    "--calibration=cal_db.json",
+                    "--nthreads=32"
+                ],
+                "step_description": "Runs process_events.sh with input, output, calibration, and thread parameters."
+            }
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "description": "Run an OpenFOAM wing simulation in parallel using SLURM and enroot container.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "enroot"
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "OpenFOAM",
+                "executed_file": null,
+                "parameters": [
+                    "source /opt/OpenFOAM-10/etc/bashrc",
+                    "decomposePar",
+                    "simpleFoam -parallel"
+                ],
+                "step_description": "Run OpenFOAM wing simulation in parallel within an enroot container."
+            }
+        }
+    ]
+}

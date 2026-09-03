@@ -1,0 +1,50 @@
+{
+    "description": "This job script submits a two-stage Geant4 simulation and analysis pipeline to a Slurm scheduler. The first stage runs a detector simulation array (200 batches) using Geant4 and ROOT, and the second stage merges the output ntuples and performs physics analysis to generate a summary report.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Geant4",
+                "executed_file": "./DetectorSim",
+                "parameters": [
+                    "-m run_calorimeter.mac",
+                    "-seed ${SEED}",
+                    "-nEvents 50000",
+                    "-o ntuples/batch_${BATCH}.root"
+                ],
+                "step_description": "Submit a Slurm job array of 200 batches to run Geant4 detector simulation (using module load geant4/11.2 and root/6.30.06) with a random seed per batch, and validate the output with ROOT macro check_ntuple.C."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "slurm"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "summarize_results.py",
+                "parameters": [
+                    "--root-file ntuples/merged_all.root",
+                    "--output plots/summary_report.pdf"
+                ],
+                "step_description": "Submit a Slurm job that waits for the simulation array to complete, then merges ntuple files with hadd, runs a ROOT analysis macro, and generates a summary report using a Python script."
+            }
+        }
+    ]
+}

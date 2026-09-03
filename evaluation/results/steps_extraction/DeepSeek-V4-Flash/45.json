@@ -1,0 +1,31 @@
+{
+    "description": "This job script runs a BLASTP protein sequence alignment against a bacterial non-redundant database, using 16 CPUs and 128 GB of memory, with results saved in XML format.",
+    "domain": "bioinformatics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "blastp",
+                "executed_file": null,
+                "parameters": [
+                    "-query bacterial_proteomes.faa",
+                    "-db nr_bacteria",
+                    "-out blast_results.xml",
+                    "-evalue 1e-10",
+                    "-num_threads 16",
+                    "-outfmt 5"
+                ],
+                "step_description": "Loads the BLAST+ module and runs a protein sequence alignment with blastp using the specified parameters against the bacterial database."
+            }
+        }
+    ]
+}

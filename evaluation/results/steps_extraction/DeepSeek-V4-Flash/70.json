@@ -1,0 +1,109 @@
+{
+    "description": "Run a coupled CESM climate simulation in 5-year segments, resubmitting until 100 years are completed, then compute climatology analysis.",
+    "domain": [
+        "earth science",
+        "climate modeling"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "set -euo pipefail",
+                    "mkdir -p logs",
+                    "module purge",
+                    "module load intel/2023.2",
+                    "module load intel-mpi/2021.10",
+                    "module load netcdf/4.9.2-mpi",
+                    "module load esmf/8.6.0",
+                    "CASE_DIR=\"/projects/myuser/cesm/cases/b.e21.BHIST.f09_g17.piControl\"",
+                    "cd \"$CASE_DIR\"",
+                    "TARGET_YEARS=100",
+                    "YEARS_PER_SEGMENT=5"
+                ],
+                "step_description": "Initialize environment, load modules, set up case directory and simulation parameters."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "CESM",
+                "executed_file": null,
+                "parameters": [
+                    "CONTINUE_RUN=TRUE/FALSE",
+                    "STOP_OPTION=nyears",
+                    "STOP_N=5",
+                    "REST_OPTION=nyears",
+                    "REST_N=5",
+                    "./case.submit --no-batch"
+                ],
+                "step_description": "Configure and submit CESM simulation segment of 5 model years, either fresh or resuming from restart."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "for COMP in cpl atm lnd ocn ice glc; do if ! ls \"${CASE_DIR}/run/\"*.${COMP}.r.*.nc >/dev/null 2>&1; then echo error; exit 1; fi; done",
+                    "NEW_YEAR=$((CURRENT_YEAR + YEARS_PER_SEGMENT))",
+                    "echo \"Completed through model year $NEW_YEAR\"",
+                    "if [ \"$NEW_YEAR\" -lt \"$TARGET_YEARS\" ]; then echo \"Resubmitting for next ${YEARS_PER_SEGMENT}-year segment\"; sbatch \"$0\"; else echo \"Target simulation length reached ($TARGET_YEARS years).\"; fi"
+                ],
+                "step_description": "Verify restart files, calculate progress, and resubmit job if under target years, otherwise proceed to analysis."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "scripts/compute_climatology.py",
+                "parameters": [
+                    "--history-dir run",
+                    "--output analysis/climatology_final.nc",
+                    "module load python/3.11 nco/5.1.9"
+                ],
+                "step_description": "Load analysis tools and run Python script to compute final climatology from simulation output."
+            }
+        }
+    ]
+}

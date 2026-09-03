@@ -1,0 +1,139 @@
+{
+    "description": "GROMACS molecular dynamics simulation with checkpoint-resume and self-resubmission, followed by trajectory analysis with Python.",
+    "domain": [
+        "chemistry",
+        "biology"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs",
+                    "module purge",
+                    "module load cuda/12.2",
+                    "module load gromacs/2024.1-gpu",
+                    "TARGET_NS=500",
+                    "SEGMENT_NS=50",
+                    "SYSTEM=protein_ligand"
+                ],
+                "step_description": "Initialization: create log directory, purge modules, load CUDA and GROMACS modules, and set key environment variables."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "gromacs",
+                "executed_file": "gmx",
+                "parameters": [
+                    "mdrun",
+                    "-deffnm",
+                    "protein_ligand",
+                    "-maxh",
+                    "23.5",
+                    "-nb",
+                    "gpu",
+                    "-pme",
+                    "gpu",
+                    "-bonded",
+                    "gpu",
+                    "-update",
+                    "gpu",
+                    "-ntmpi",
+                    "2",
+                    "-ntomp",
+                    "12"
+                ],
+                "step_description": "Run or resume GROMACS molecular dynamics simulation using GPU acceleration, either from checkpoint or fresh start."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "gmx",
+                "executed_file": "gmx",
+                "parameters": [
+                    "check",
+                    "-f",
+                    "protein_ligand.xtc"
+                ],
+                "step_description": "Check the progress of the simulation by reading the trajectory file to determine the current simulated time."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "TARGET_NS",
+                    "CURRENT_NS_INT"
+                ],
+                "step_description": "Check if the target simulation time has been reached; if not, resubmit the job script, else proceed with analysis."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_trajectory.py",
+                "parameters": [
+                    "--xtc",
+                    "protein_ligand.xtc",
+                    "--tpr",
+                    "protein_ligand.tpr",
+                    "--output",
+                    "analysis/protein_ligand_final_report.pdf"
+                ],
+                "step_description": "Run a Python script to analyze the trajectory and produce a final report in PDF format."
+            }
+        }
+    ]
+}

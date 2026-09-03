@@ -1,0 +1,29 @@
+{
+    "description": "Run NAMD metadynamics simulation using Docker with GPU resources.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "docker"
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "NAMD",
+                "executed_file": null,
+                "parameters": [
+                    "+p16",
+                    "+isomalloc_sync",
+                    "/data/metadynamics.conf",
+                    "COLVARS_CONFIG=/data/pulling.colvars"
+                ],
+                "step_description": "Run NAMD metadynamics simulation inside a Docker container with GPU support and specified configuration and colvars files."
+            }
+        }
+    ]
+}

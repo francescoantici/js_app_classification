@@ -1,0 +1,11 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: cylc
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: cylc
+  target_executable: cylc play
+  workload_category: other_unknown
+compute_profile: []

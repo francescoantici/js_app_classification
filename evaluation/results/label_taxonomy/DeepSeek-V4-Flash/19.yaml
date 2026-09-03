@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: singularity
+workload:
+  primary_software: null
+  target_executable: train_hvd_torch.py
+  workload_category: ai_ml
+compute_profile:
+- distributed_framework
+- mpi

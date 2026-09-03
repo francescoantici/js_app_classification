@@ -1,0 +1,75 @@
+{
+    "description": "Quantum VQE simulation of H2O molecule at different bond lengths using array job, generating geometries, running VQE optimization on GPU, and summarizing results.",
+    "domain": [
+        "quantum chemistry",
+        "physics",
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Generates a TSV file containing 50 bond lengths for H2O molecules from 0.5 to 3.0 Angstrom."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "python",
+                "executed_file": "vqe_molecule.py",
+                "parameters": [
+                    "--molecule H2O",
+                    "--bond-length ${BOND_LENGTH}",
+                    "--basis sto-3g",
+                    "--ansatz UCCSD",
+                    "--optimizer COBYLA",
+                    "--max-iterations 500",
+                    "--backend aer_simulator_statevector_gpu",
+                    "--shots 0",
+                    "--seed ${TASK_ID}",
+                    "--output results/vqe_result_${ID}.json"
+                ],
+                "step_description": "Runs VQE optimization for H2O at a specific bond length using Qiskit with GPU acceleration."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Reads the VQE result JSON and prints the optimal energy and convergence status."
+            }
+        }
+    ]
+}

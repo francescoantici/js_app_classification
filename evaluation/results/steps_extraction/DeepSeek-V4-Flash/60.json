@@ -1,0 +1,35 @@
+{
+    "description": "This script submits a VASP relaxation job to a Slurm cluster, managing job restart logic and setting up environment variables.",
+    "domain": [
+        "physics",
+        "materials science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "VASP",
+                "executed_file": "vasp_std",
+                "parameters": [
+                    "srun --mpi=pmi2",
+                    "OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK",
+                    "I_MPI_PIN_DOMAIN=omp",
+                    "NCORE=$NCORE_VAL",
+                    "ISTART=1",
+                    "ICHARG=0",
+                    "CONTCAR file handling"
+                ],
+                "step_description": "Runs VASP relaxation with environment setup, input file modifications, and job resubmission logic."
+            }
+        }
+    ]
+}

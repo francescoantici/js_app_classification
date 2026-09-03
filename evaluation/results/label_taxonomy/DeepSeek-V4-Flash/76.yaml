@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: hifiasm
+  target_executable: genome_assembly
+  workload_category: bioinformatics
+compute_profile:
+- openmp

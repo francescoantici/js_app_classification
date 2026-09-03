@@ -1,0 +1,140 @@
+{
+    "description": "Run a GPU-accelerated EPOCH2D particle-in-cell simulation of laser-plasma interaction with checkpoint restart, then analyze electron spectrum with a Python script.",
+    "domain": [
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs diagnostics checkpoints",
+                    "module purge",
+                    "module load cuda/12.2",
+                    "module load openmpi/4.1.5",
+                    "module load epoch/4.19-gpu",
+                    "CASE_DIR=/projects/myuser/pic/lwfa_bubble_regime",
+                    "cd $CASE_DIR"
+                ],
+                "step_description": "Set up directories, load required modules, and navigate to the case directory."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "TOTAL_GPUS=$((SLURM_NNODES * 4))",
+                    "RESTART_FLAG=-r if checkpoint exists, else empty"
+                ],
+                "step_description": "Calculate total number of GPUs and determine restart flag based on checkpoint existence."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "cat > input.deck"
+                ],
+                "step_description": "Generate an EPOCH input deck with specified laser-plasma simulation parameters."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "EPOCH2D",
+                "executed_file": null,
+                "parameters": [
+                    "--mpi=pmix",
+                    "--gpus-per-task=1",
+                    "./epoch2d_gpu",
+                    "$RESTART_FLAG",
+                    "< input.deck"
+                ],
+                "step_description": "Execute the EPOCH2D GPU particle-in-cell simulation using srun with MPI and GPU support."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [],
+                "step_description": "Check if the final diagnostic file exists and report simulation status."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "analyze_electron_spectrum.py",
+                "parameters": [
+                    "--diagnostics-dir",
+                    "diagnostics",
+                    "--output",
+                    "diagnostics/electron_energy_spectrum.png"
+                ],
+                "step_description": "Run a Python script to analyze electron energy spectrum from diagnostics and output a plot."
+            }
+        }
+    ]
+}

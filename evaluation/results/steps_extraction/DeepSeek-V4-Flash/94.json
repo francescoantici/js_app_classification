@@ -1,0 +1,249 @@
+{
+    "description": "Adjoint-based aerodynamic shape optimization loop using SU2 CFD solver, adjoint solver, gradient computation, shape update via Python script, and mesh deformation, running across multiple design iterations with optional resubmission.",
+    "domain": [
+        "aerodynamics",
+        "optimization"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs design_iterations",
+                    "module purge",
+                    "module load openmpi/4.1.5",
+                    "module load su2/8.0.1",
+                    "module load python/3.11",
+                    "cd /projects/myuser/aero_opt/wing_drag_minimization",
+                    "CURRENT_ITER=$(ls -d design_iterations/design_* 2>/dev/null | wc -l)"
+                ],
+                "step_description": "Set up directories, load environment modules, and determine starting iteration."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "ITER=0",
+                    "ln -sf ../../baseline_mesh.su2 mesh.su2",
+                    "cp ../../config_flow.cfg .",
+                    "cp ../../config_adjoint.cfg ."
+                ],
+                "step_description": "Set up first design iteration with symlink to baseline mesh and copy configuration files."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "SU2_CFD",
+                "executed_file": null,
+                "parameters": [
+                    "config_flow.cfg",
+                    "--mpi=pmix"
+                ],
+                "step_description": "Run SU2 CFD flow solver to compute aerodynamic coefficients (drag and lift)."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "grep Total CD flow.log | tail -n1 | awk '{print $NF}'",
+                    "grep Total CL flow.log | tail -n1 | awk '{print $NF}'"
+                ],
+                "step_description": "Extract drag and lift coefficients from flow solver log."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "SU2_CFD_AD",
+                "executed_file": null,
+                "parameters": [
+                    "config_adjoint.cfg",
+                    "--mpi=pmix"
+                ],
+                "step_description": "Run SU2 adjoint solver to compute sensitivity derivatives."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "SU2_DOT_AD",
+                "executed_file": null,
+                "parameters": [
+                    "config_adjoint.cfg",
+                    "--mpi=pmix"
+                ],
+                "step_description": "Run SU2 gradient computation to obtain surface sensitivities."
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "grep Gradient norm gradient.log | tail -n1 | awk '{print $NF}'",
+                    "awk -v g=$GRAD_NORM -v t=$GRAD_TOL 'BEGIN{exit !(g < t)}'"
+                ],
+                "step_description": "Extract gradient norm and check convergence against tolerance."
+            }
+        },
+        {
+            "step_id": 8,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "../../compute_shape_update.py",
+                "parameters": [
+                    "--gradient-file surface_sensitivity.dat",
+                    "--step-size 0.01",
+                    "--output design_update.dat"
+                ],
+                "step_description": "Run Python script to compute shape update from sensitivity data."
+            }
+        },
+        {
+            "step_id": 9,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "SU2_DEF",
+                "executed_file": null,
+                "parameters": [
+                    "config_flow.cfg",
+                    "--mpi=pmix"
+                ],
+                "step_description": "Run SU2 mesh deformation to generate deformed mesh for next iteration."
+            }
+        },
+        {
+            "step_id": 10,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mv mesh_deformed.su2 deformed_mesh.su2",
+                    "cd ../.."
+                ],
+                "step_description": "Rename deformed mesh and return to case directory."
+            }
+        },
+        {
+            "step_id": 11,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "echo Final CD=$DRAG CL=$LIFT",
+                    "awk -v g=$GRAD_NORM -v t=$GRAD_TOL 'BEGIN{exit !(g < t)}'",
+                    "sbatch $0"
+                ],
+                "step_description": "Print final aerodynamic coefficients and resubmit job if maximum iterations reached without convergence."
+            }
+        }
+    ]
+}

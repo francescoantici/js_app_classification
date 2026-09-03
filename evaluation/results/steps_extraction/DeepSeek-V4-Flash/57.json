@@ -1,0 +1,144 @@
+{
+    "description": "RNA-seq pipeline with FastQC, Trim Galore, and Salmon quantification run as a SLURM job array",
+    "domain": [
+        "bioinformatics",
+        "genomics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs results failed_qc",
+                    "SAMPLE_SHEET=\"rnaseq_samples.tsv\"",
+                    "LINE=$((SLURM_ARRAY_TASK_ID + 1))",
+                    "read -r SAMPLE_ID R1 R2 CONDITION <<< \"$(sed -n \"${LINE}p\" \"$SAMPLE_SHEET\")\"",
+                    "module purge",
+                    "module load fastqc/0.12.1",
+                    "module load trimgalore/0.6.10",
+                    "module load salmon/1.10.2",
+                    "WORKDIR=\"tmp/${SAMPLE_ID}\"",
+                    "mkdir -p \"$WORKDIR\" \"results/${SAMPLE_ID}\""
+                ],
+                "step_description": "Set up directories, load sample metadata, load environment modules, and create sample work directory"
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "fastqc",
+                "executed_file": null,
+                "parameters": [
+                    "-o",
+                    "$WORKDIR",
+                    "-t",
+                    "$SLURM_CPUS_PER_TASK",
+                    "$R1",
+                    "$R2"
+                ],
+                "step_description": "Run FastQC on raw reads and parse deduplication percentage for quality gate"
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "trim_galore",
+                "executed_file": null,
+                "parameters": [
+                    "--paired",
+                    "--cores",
+                    "$SLURM_CPUS_PER_TASK",
+                    "--output_dir",
+                    "$WORKDIR",
+                    "$R1",
+                    "$R2"
+                ],
+                "step_description": "Trim adapter sequences from paired-end reads with Trim Galore"
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "salmon",
+                "executed_file": null,
+                "parameters": [
+                    "quant",
+                    "-i",
+                    "/references/salmon_index_grch38",
+                    "-l",
+                    "A",
+                    "-1",
+                    "$TRIMMED_R1",
+                    "-2",
+                    "$TRIMMED_R2",
+                    "-p",
+                    "$SLURM_CPUS_PER_TASK",
+                    "--validateMappings",
+                    "--gcBias",
+                    "-o",
+                    "results/${SAMPLE_ID}/salmon_quant"
+                ],
+                "step_description": "Quantify transcript expression with Salmon using trimmed reads"
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "echo -e \"${SAMPLE_ID}\\t${CONDITION}\\tresults/${SAMPLE_ID}/salmon_quant/quant.sf\" >> results/sample_manifest.tsv",
+                    "rm -rf \"$WORKDIR\""
+                ],
+                "step_description": "Append sample metadata to manifest and clean up temporary work directory"
+            }
+        }
+    ]
+}

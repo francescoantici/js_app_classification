@@ -1,0 +1,29 @@
+{
+    "description": "Run a CP2K metadynamics simulation on 8 nodes with 256 MPI processes and 2 OpenMP threads per process.",
+    "domain": "chemistry",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "cp2k",
+                "executed_file": null,
+                "parameters": [
+                    "module load cp2k/2023.2",
+                    "export OMP_NUM_THREADS=2",
+                    "export CP2K_DATA_DIR=/opt/cp2k/data",
+                    "mpirun -np 256 cp2k.psmp -i reaction_metadynamics.inp -o reaction.out -npools 4"
+                ],
+                "step_description": "Load CP2K module, set OpenMP threads and data directory, then run CP2K metadynamics simulation."
+            }
+        }
+    ]
+}

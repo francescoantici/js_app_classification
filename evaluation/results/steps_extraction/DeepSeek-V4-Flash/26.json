@@ -1,0 +1,51 @@
+{
+    "description": "Archive CMIP6 climate experiment data by creating a tar archive, excluding temporary files, and compressing it with gzip for long-term storage in a transfer partition.",
+    "domain": "climate",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "tar",
+                "executed_file": null,
+                "parameters": [
+                    "-cvf",
+                    "climate_output.tar",
+                    "--exclude='*.tmp'",
+                    "--checkpoint=1000",
+                    "experiment_01/"
+                ],
+                "step_description": "Creates a tar archive of the experiment_01 directory, excluding temporary files, with progress checkpoint every 1000 files."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "gzip",
+                "executed_file": null,
+                "parameters": [
+                    "-9",
+                    "climate_output.tar"
+                ],
+                "step_description": "Compresses the tar archive with maximum compression level."
+            }
+        }
+    ]
+}

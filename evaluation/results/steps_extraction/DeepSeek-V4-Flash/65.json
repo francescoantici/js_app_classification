@@ -1,0 +1,195 @@
+{
+    "description": "Run LAMMPS molecular dynamics simulation on GPU nodes using Kokkos, including an optional strong-scaling benchmark and post-processing archiving.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": null,
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs dumps",
+                    "module purge",
+                    "module load cuda/12.2",
+                    "module load openmpi/4.1.5",
+                    "module load lammps/2Aug2024-kokkos-gpu"
+                ],
+                "step_description": "Set up directories and load required modules."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": null,
+                "executed_file": null,
+                "parameters": [
+                    "CASE_DIR=\"/projects/myuser/lammps/tungsten_cascade\"",
+                    "cd \"$CASE_DIR\"",
+                    "TOTAL_GPUS=$((SLURM_NNODES * 4))"
+                ],
+                "step_description": "Set case directory and calculate total GPU count."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "lammps",
+                "executed_file": null,
+                "parameters": [
+                    "-k on g 4",
+                    "-sf kk",
+                    "-pk kokkos gpu/aware on",
+                    "-in in.benchmark_cascade",
+                    "-log benchmark_4ranks.log"
+                ],
+                "step_description": "Run strong-scaling benchmark with srun for 4 MPI ranks."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "lammps",
+                "executed_file": null,
+                "parameters": [
+                    "-k on g 8",
+                    "-sf kk",
+                    "-pk kokkos gpu/aware on",
+                    "-in in.benchmark_cascade",
+                    "-log benchmark_8ranks.log"
+                ],
+                "step_description": "Run strong-scaling benchmark with srun for 8 MPI ranks."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "lammps",
+                "executed_file": null,
+                "parameters": [
+                    "-k on g 16",
+                    "-sf kk",
+                    "-pk kokkos gpu/aware on",
+                    "-in in.benchmark_cascade",
+                    "-log benchmark_16ranks.log"
+                ],
+                "step_description": "Run strong-scaling benchmark with srun for 16 MPI ranks."
+            }
+        },
+        {
+            "step_id": 6,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "lammps",
+                "executed_file": null,
+                "parameters": [
+                    "-k on g 32",
+                    "-sf kk",
+                    "-pk kokkos gpu/aware on",
+                    "-in in.benchmark_cascade",
+                    "-log benchmark_32ranks.log"
+                ],
+                "step_description": "Run strong-scaling benchmark with srun for 32 MPI ranks."
+            }
+        },
+        {
+            "step_id": 7,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "lammps",
+                "executed_file": null,
+                "parameters": [
+                    "-k on g $TOTAL_GPUS",
+                    "-sf kk",
+                    "-pk kokkos gpu/aware on neigh full newton on",
+                    "-in in.cascade_production",
+                    "-var seed \"$RANDOM\"",
+                    "-var dump_dir dumps",
+                    "-log lammps_production.log"
+                ],
+                "step_description": "Run production LAMMPS simulation using all available GPUs."
+            }
+        },
+        {
+            "step_id": 8,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "tar",
+                "executed_file": null,
+                "parameters": [
+                    "-czf \"dumps_${SLURM_JOB_ID}.tar.gz\"",
+                    "dumps/"
+                ],
+                "step_description": "Compress trajectory dumps into a tarball."
+            }
+        }
+    ]
+}

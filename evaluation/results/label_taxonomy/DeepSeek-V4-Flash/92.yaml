@@ -1,0 +1,12 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: slurm
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: PISM
+  target_executable: pismr
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

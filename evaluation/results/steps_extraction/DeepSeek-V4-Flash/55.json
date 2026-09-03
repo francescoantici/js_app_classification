@@ -1,0 +1,100 @@
+{
+    "description": "Run a hybrid MPI/OpenMP CFD simulation with automatic restart and cleanup of old restart files.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": null,
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs restarts",
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load openmpi/4.1.5",
+                    "export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK",
+                    "export OMP_PLACES=cores",
+                    "export OMP_PROC_BIND=close",
+                    "export OMP_STACKSIZE=512M"
+                ],
+                "step_description": "Prepare environment: create directories, load modules, set OpenMP environment variables."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": null,
+                "executed_file": null,
+                "parameters": [
+                    "cd /projects/myuser/cfd/turbine_case",
+                    "ls -t restarts/*.rst 2>/dev/null | head -n1",
+                    "test -n \"$LATEST_RESTART\""
+                ],
+                "step_description": "Change to case directory and detect the latest restart file, setting RESTART_FLAG accordingly."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "cfd_solver",
+                "executed_file": null,
+                "parameters": [
+                    "--config turbine.cfg",
+                    "--restart /path/to/restart/file",
+                    "--restart-every 3600",
+                    "--restart-dir ./restarts",
+                    "--max-restarts-kept 3"
+                ],
+                "step_description": "Execute the CFD solver with hybrid MPI/OpenMP parallelism, using optional restart and periodic checkpointing."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": null,
+                "executed_file": null,
+                "parameters": [
+                    "ls -t *.rst",
+                    "xargs -r rm -f"
+                ],
+                "step_description": "After simulation, remove old restart files, keeping only the latest three, and print status and convergence log path."
+            }
+        }
+    ]
+}

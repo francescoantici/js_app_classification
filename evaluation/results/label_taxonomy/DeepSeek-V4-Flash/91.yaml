@@ -1,0 +1,12 @@
+orchestration:
+  type: job_array
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: phasefield_solver
+  target_executable: phasefield_solver
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

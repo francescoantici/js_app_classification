@@ -1,0 +1,12 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: BerkeleyGW
+  target_executable: plot_absorption_spectrum.py
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

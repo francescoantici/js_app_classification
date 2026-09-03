@@ -1,0 +1,12 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: slurm
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: Nyx
+  target_executable: Nyx3d.gnu.MPI.ex
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

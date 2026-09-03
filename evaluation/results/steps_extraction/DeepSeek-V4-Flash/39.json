@@ -1,0 +1,32 @@
+{
+    "description": "The job script installs and runs a Cylc workflow suite for numerical weather prediction (NWP) using the 'nwp_suite' workflow definition, with an initial cycle point of 20240101T00Z. The workflow runs in the foreground, waiting for completion.",
+    "domain": [
+        "weather forecasting"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "workflow_managed",
+                "tool_detected": "cylc"
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "cylc",
+                "executed_file": "nwp_suite",
+                "parameters": [
+                    "install",
+                    "play",
+                    "--no-detach",
+                    "-m",
+                    "initial_cycle_point=20240101T00Z"
+                ],
+                "step_description": "Installs the Cylc workflow suite 'nwp_suite' and runs it with a specified initial cycle point, using the native execution environment."
+            }
+        }
+    ]
+}

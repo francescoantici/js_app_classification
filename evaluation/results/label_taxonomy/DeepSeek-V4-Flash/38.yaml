@@ -1,0 +1,11 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: enroot
+workload:
+  primary_software: PyTorch Geometric
+  target_executable: train_gnn.py
+  workload_category: ai_ml
+compute_profile: []

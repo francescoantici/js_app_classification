@@ -1,0 +1,12 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: sbatch
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: chroma
+  target_executable: chroma
+  workload_category: simulation_modeling
+compute_profile:
+- mpi

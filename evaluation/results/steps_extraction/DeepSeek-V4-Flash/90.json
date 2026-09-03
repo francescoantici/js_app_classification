@@ -1,0 +1,122 @@
+{
+    "description": "This job script runs a numerical relativity binary black hole merger simulation using the Einstein Toolkit (Cactus) with Carpet mesh refinement, supports checkpoint/restart, detects merger, extracts gravitational waveforms, and optionally resubmits itself for continuation.",
+    "domain": [
+        "physics",
+        "astrophysics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs",
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load openmpi/4.1.5",
+                    "module load hdf5/1.14.0-mpi",
+                    "module load petsc/3.20.0",
+                    "module load gsl/2.7.1",
+                    "cd $CASE_DIR",
+                    "ls -d checkpoints/checkpoint.chkpt.it_* 2>/dev/null | sort -t_ -k2 -n | tail -n1 || true"
+                ],
+                "step_description": "Sets up the job environment by loading required modules, preparing the case directory, and finding the latest checkpoint for restart if available."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "Cactus",
+                "executed_file": "./cactus_sim",
+                "parameters": [
+                    "--mpi=pmix",
+                    "$PARFILE"
+                ],
+                "step_description": "Runs the Cactus simulation (Einstein Toolkit) with MPI via srun, using either restart or initial parameter file depending on checkpoint availability."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "rm -f TERMINATE_REQUESTED",
+                    "grep -c 'common horizon found' output/BH_diagnostics.log 2>/dev/null || echo 0",
+                    "echo 'Common apparent horizon detected - merger has occurred.' || true",
+                    "grep -q 'Simulation finished' output/cctk_output.log 2>/dev/null || true"
+                ],
+                "step_description": "Performs post-simulation checks to detect if merger occurred and whether the simulation completed, logging appropriate messages."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "extract_waveform.py",
+                "parameters": [
+                    "--psi4-dir output/psi4_extraction",
+                    "--output analysis/strain_waveform.h5"
+                ],
+                "step_description": "If simulation completed, loads Python and runs the waveform extraction script to convert psi4 data to gravitational wave strain."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "sbatch \"$0\""
+                ],
+                "step_description": "If simulation is incomplete, resubmits the same job script for the next segment."
+            }
+        }
+    ]
+}

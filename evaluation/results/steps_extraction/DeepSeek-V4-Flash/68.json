@@ -1,0 +1,130 @@
+{
+    "description": "Seismic full waveform inversion (FWI) using parallel forward modeling and optimization, segmented over multiple job submissions to handle long runtimes, with model checkpointing and final visualization.",
+    "domain": "geoscience",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs models gradients",
+                    "module purge",
+                    "module load gcc/12.2.0",
+                    "module load openmpi/4.1.5",
+                    "module load petsc/3.20.0",
+                    "cd /projects/myuser/seismic/fwi_field_survey",
+                    "TARGET_ITERS=100",
+                    "ITERS_PER_SEGMENT=10",
+                    "N_SHOTS=240"
+                ],
+                "step_description": "Set up directories, load environment modules, set variables, and change to case directory."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "LATEST_MODEL=$(ls -v models/vp_iter*.bin 2>/dev/null | tail -n1 || true)",
+                    "if [ -n \"$LATEST_MODEL\" ]; then CURRENT_ITER=$(echo \"$LATEST_MODEL\" | grep -oP 'iter\\K[0-9]+'); echo \"Resuming from iteration $CURRENT_ITER: $LATEST_MODEL\"; else CURRENT_ITER=0; echo \"Starting from initial velocity model\"; cp models/vp_initial.bin models/vp_iter0.bin; fi",
+                    "END_ITER=$((CURRENT_ITER + ITERS_PER_SEGMENT))",
+                    "if [ \"$END_ITER\" -gt \"$TARGET_ITERS\" ]; then END_ITER=$TARGET_ITERS; fi",
+                    "echo \"Running iterations ${CURRENT_ITER} -> ${END_ITER} over ${N_SHOTS} shots\""
+                ],
+                "step_description": "Determine starting iteration from existing checkpoints, set ending iteration for this segment, and print run summary."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "fwi_driver",
+                "executed_file": "./fwi_driver",
+                "parameters": [
+                    "--start-iter \"$CURRENT_ITER\"",
+                    "--end-iter \"$END_ITER\"",
+                    "--n-shots \"$N_SHOTS\"",
+                    "--model-dir models",
+                    "--gradient-dir gradients",
+                    "--optimizer lbfgs",
+                    "--lbfgs-memory 10",
+                    "--step-length-init 0.01",
+                    "--checkpoint-every-iter"
+                ],
+                "step_description": "Run the FWI driver executable in parallel with srun, performing seismic inversion iterations and writing checkpoints and gradients."
+            }
+        },
+        {
+            "step_id": 4,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": null,
+                "parameters": [
+                    "- <<EOF",
+                    "import json",
+                    "with open(\"gradients/misfit_history.json\") as f: hist = json.load(f)",
+                    "print(f\"Misfit at iter {hist[-1]['iter']}: {hist[-1]['misfit']:.6e}\")",
+                    "EOF"
+                ],
+                "step_description": "Parse the misfit history JSON file and print the latest iteration misfit value."
+            }
+        },
+        {
+            "step_id": 5,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "bash",
+                "executed_file": null,
+                "parameters": [
+                    "if [ \"$END_ITER\" -lt \"$TARGET_ITERS\" ]; then echo \"Resubmitting for iterations ${END_ITER}+\"; sbatch \"$0\"; else echo \"Target iteration count reached ($TARGET_ITERS). Generating final model plots.\"; module load python/3.11; python3 plot_velocity_model.py --model \"models/vp_iter${END_ITER}.bin\" --output \"models/final_model_${SLURM_JOB_ID}.png\"; fi"
+                ],
+                "step_description": "Resubmit the same script to continue iterations if the target is not reached; otherwise load Python and generate final model plot."
+            }
+        }
+    ]
+}

@@ -1,0 +1,58 @@
+{
+    "description": "Submit an Abaqus finite element analysis job with restart handling, then extract results using a Python script.",
+    "domain": [
+        "engineering",
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "abaqus",
+                "executed_file": null,
+                "parameters": [
+                    "job=bracket_contact_nl",
+                    "input=bracket_contact_nl.inp",
+                    "cpus=36",
+                    "mp_mode=mpi",
+                    "memory=450gb",
+                    "scratch=/scratch/${USER}/${SLURM_JOB_ID}",
+                    "interactive"
+                ],
+                "step_description": "Run Abaqus analysis with MPI across 36 CPUs using Intel MPI, with restart flag if previous run incomplete."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "extract_results.py",
+                "parameters": [
+                    "--odb",
+                    "${JOB_NAME}.odb",
+                    "--output",
+                    "summary_results.csv"
+                ],
+                "step_description": "Run Abaqus Python script to extract results from ODB file and generate summary CSV."
+            }
+        }
+    ]
+}

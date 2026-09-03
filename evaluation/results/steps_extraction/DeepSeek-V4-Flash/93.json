@@ -1,0 +1,88 @@
+{
+    "description": "Array job running OPAL accelerator beam dynamics simulations for varied lattice configurations, generating inputs and extracting beam statistics.",
+    "domain": [
+        "physics"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "python3",
+                "executed_file": null,
+                "parameters": [
+                    "-",
+                    "EOF",
+                    "import itertools",
+                    "k1s = [1.2, 1.4, 1.6, 1.8, 2.0]",
+                    "k2s = [-1.8, -1.6, -1.4]",
+                    "phases = [0, 5]",
+                    "rows = []",
+                    "for i, (k1, k2, ph) in enumerate(itertools.product(k1s, k2s, phases), start=1):",
+                    "rows.append(f\"{i}\\t{k1}\\t{k2}\\t{ph}\")",
+                    "with open(\"lattice_configs.tsv\", \"w\") as f:",
+                    "f.write(\"id\\tquad_k1\\tquad_k2\\trf_phase_deg\\n\")",
+                    "f.write(\"\\n\".join(rows) + \"\\n\")",
+                    "EOF"
+                ],
+                "step_description": "Generates lattice configuration table using inline Python script if not present."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "opal",
+                "executed_file": "linac_config.in",
+                "parameters": [
+                    "-np",
+                    "$SLURM_NTASKS",
+                    "opal",
+                    "linac_config.in",
+                    "--info",
+                    "2"
+                ],
+                "step_description": "Runs OPAL simulation for the current lattice configuration using MPI."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python3",
+                "executed_file": "extract_beam_stats.py",
+                "parameters": [
+                    "--stat-file",
+                    "linac_config.stat",
+                    "--output",
+                    "emittance_summary_${ID}.json"
+                ],
+                "step_description": "Extracts beam statistics from simulation output and saves to JSON summary."
+            }
+        }
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "description": "The job script submits a Dask-based satellite image processing task to a SLURM cluster, requesting 10 nodes with 32 CPUs each, and runs a Python script that processes Sentinel-2 tiles in parallel using a distributed scheduler.",
+    "domain": [
+        "earth science",
+        "data science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "process_satellite_dask.py",
+                "parameters": [
+                    "--scheduler-file=/home/user/dask-scheduler.json",
+                    "--tiles=sentinel2_tiles.txt",
+                    "--chunk-size=1024",
+                    "--bands=4"
+                ],
+                "step_description": "Activates the 'dask_env' Conda environment and runs the Dask-based satellite image processing script with specified scheduler file, tile list, chunk size, and number of bands."
+            }
+        }
+    ]
+}

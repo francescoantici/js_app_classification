@@ -1,0 +1,91 @@
+{
+    "description": "A multi-cycle Ensemble Kalman Filter (EnKF) data assimilation workflow using WRF (Weather Research and Forecasting) model for forecasts and Python for analysis updates, orchestrated as a chain of Slurm array jobs with dependencies.",
+    "domain": [
+        "weather",
+        "earth science",
+        "data science"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "shell",
+                "executed_file": null,
+                "parameters": [
+                    "mkdir -p logs ensemble analysis",
+                    "N_MEMBERS=80",
+                    "N_CYCLES=24",
+                    "CYCLE_HOURS=6"
+                ],
+                "step_description": "Initialization: create directories and set job parameters."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "WRF",
+                "executed_file": "wrf.exe",
+                "parameters": [
+                    "--job-name=enkf_fcst_c${CYCLE}",
+                    "--partition=compute",
+                    "--array=1-${N_MEMBERS}%40",
+                    "--nodes=1",
+                    "--ntasks-per-node=16",
+                    "--time=01:30:00"
+                ],
+                "step_description": "Submit a Slurm job array of WRF ensemble forecasts for each cycle, with tasks launching WRF model runs and copying output data."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "run_enkf_update.py",
+                "parameters": [
+                    "--forecast-dir",
+                    "ensemble",
+                    "--forecast-pattern",
+                    "forecast_c${CYCLE}_mem_*.nc",
+                    "--obs-file",
+                    "observations/obs_cycle_${CYCLE}.nc",
+                    "--n-members",
+                    "${N_MEMBERS}",
+                    "--inflation",
+                    "adaptive",
+                    "--localization-radius-km",
+                    "500",
+                    "--output-dir",
+                    "analysis/cycle_${CYCLE}"
+                ],
+                "step_description": "Submit a Python analysis job that runs the EnKF update on the ensemble forecasts, using observations and parameterized settings."
+            }
+        }
+    ]
+}

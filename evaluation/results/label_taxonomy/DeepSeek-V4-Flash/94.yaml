@@ -1,0 +1,14 @@
+orchestration:
+  type: workflow_managed
+  tool_detected: SU2
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: null
+  target_executable: null
+  workload_category: simulation_modeling
+compute_profile:
+- mpi
+- openmp
+- task_farming

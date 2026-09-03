@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: containerized
+  tool_detected: docker
+workload:
+  primary_software: NAMD
+  target_executable: namd2
+  workload_category: simulation_modeling
+compute_profile:
+- mpi
+- openmp

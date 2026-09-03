@@ -1,0 +1,11 @@
+orchestration:
+  type: job_array
+  tool_detected: null
+execution_environment:
+  type: virtual_environment
+  tool_detected: conda
+workload:
+  primary_software: pyFAI
+  target_executable: average_and_subtract_background.py
+  workload_category: data_processing_etl
+compute_profile: []

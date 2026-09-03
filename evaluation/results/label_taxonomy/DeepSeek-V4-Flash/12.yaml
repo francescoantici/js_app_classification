@@ -1,0 +1,12 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: spark
+  target_executable: process_logs.py
+  workload_category: data_processing_etl
+compute_profile:
+- distributed_framework

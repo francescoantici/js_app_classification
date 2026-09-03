@@ -1,0 +1,31 @@
+{
+    "description": "Runs an Octave script to solve a 2D heat equation simulation with specified grid size, time steps, and thermal diffusivity, outputting the temperature field to a MATLAB file.",
+    "domain": [
+        "physics",
+        "math"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "octave",
+                "executed_file": null,
+                "parameters": [
+                    "-q",
+                    "--eval",
+                    "heat_equation('grid_size',512,'time_steps',10000,'alpha',0.01,'output_file','temperature_field.mat')"
+                ],
+                "step_description": "Loads Octave module and executes an inline Octave command to run the heat equation simulation with given parameters."
+            }
+        }
+    ]
+}

@@ -1,0 +1,31 @@
+{
+    "description": "Preprocess a raw video by extracting frames at 30 fps, scaling to 224x224, and encoding as JPEG images using ffmpeg.",
+    "domain": "video processing",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "utility",
+                "primary_software": "ffmpeg",
+                "executed_file": null,
+                "parameters": [
+                    "-i raw_video.mp4",
+                    "-vf scale=224:224,fps=30",
+                    "-c:v libx264",
+                    "-preset slow",
+                    "-crf 22",
+                    "output_%04d.jpg"
+                ],
+                "step_description": "Run ffmpeg to extract frames from raw_video.mp4, applying scaling and fps filter, then save as sequentially numbered JPEG images."
+            }
+        }
+    ]
+}

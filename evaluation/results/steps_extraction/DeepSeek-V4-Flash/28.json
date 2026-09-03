@@ -1,0 +1,33 @@
+{
+    "description": "Run an OpenMM molecular dynamics simulation on a GPU cluster using SLURM, with a Python script for structure preparation and simulation.",
+    "domain": [
+        "biophysics",
+        "chemistry"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "OpenMM",
+                "executed_file": "openmm_pipeline.py",
+                "parameters": [
+                    "--pdb initial_structure.pdb",
+                    "--forcefield amber14",
+                    "--steps-minimize 10000",
+                    "--steps-prod 50000000",
+                    "--platform CUDA"
+                ],
+                "step_description": "Activate the conda environment and run the OpenMM pipeline script for molecular dynamics simulation with specified parameters."
+            }
+        }
+    ]
+}

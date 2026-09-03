@@ -1,0 +1,87 @@
+{
+    "description": "This job script runs a PISM ice-sheet model simulation for Greenland under an SSP585 climate forcing scenario, in segments of 50 years, resubmitting itself until the target 500-year simulation is completed. It also computes sea level contribution at each segment and generates a final cumulative sea level projection plot.",
+    "domain": [
+        "climate",
+        "geoscience"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "PISM",
+                "executed_file": "pismr",
+                "parameters": [
+                    "$INPUT_FLAG",
+                    "-Mx 768",
+                    "-My 1360",
+                    "-Mz 101",
+                    "-Lz 4000",
+                    "-surface given",
+                    "-surface_given_file climate_forcing_ssp585.nc",
+                    "-atmosphere given",
+                    "-ocean th",
+                    "-sia_e 3.0",
+                    "-pik",
+                    "-y \"$YEARS_PER_SEGMENT\"",
+                    "-o \"$OUTPUT_STATE\"",
+                    "-extra_file states/timeseries_${CURRENT_YEAR}_${END_YEAR}.nc",
+                    "-extra_times \"${YEARS_PER_SEGMENT}\"/1/\"${YEARS_PER_SEGMENT}\"",
+                    "-extra_vars thk,velsurf_mag,mask,topg"
+                ],
+                "step_description": "Run PISM ice-sheet model (pismr) in parallel using srun/mpirun, with input from a bootstrap file or the latest state, for a 50-year segment, writing output state and extra output files."
+            }
+        },
+        {
+            "step_id": 2,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "compute_sle_contribution.py",
+                "parameters": [
+                    "--state-before \"${LATEST_STATE:-greenland_bootstrap.nc}\"",
+                    "--state-after \"$OUTPUT_STATE\"",
+                    "--output \"states/sle_change_${CURRENT_YEAR}_${END_YEAR}.json\""
+                ],
+                "step_description": "Run a Python script to compute the sea level contribution between the previous and current simulation states, outputting the result as a JSON file."
+            }
+        },
+        {
+            "step_id": 3,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "data_analytics",
+                "primary_software": "python",
+                "executed_file": "plot_cumulative_sle.py",
+                "parameters": [
+                    "--states-dir states",
+                    "--output final_sle_projection.png"
+                ],
+                "step_description": "After reaching the target simulation length, run a Python script to plot the cumulative sea level contribution and save the final projection as a PNG image."
+            }
+        }
+    ]
+}

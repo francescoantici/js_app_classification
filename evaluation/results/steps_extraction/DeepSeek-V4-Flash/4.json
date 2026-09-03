@@ -1,0 +1,30 @@
+{
+    "description": "This job script runs a LAMMPS molecular dynamics simulation with varying temperature parameters using the PBS array index.",
+    "domain": "physics",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "job_array",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "LAMMPS",
+                "executed_file": "polymer_sweep.in",
+                "parameters": [
+                    "-np 4",
+                    "-in polymer_sweep.in",
+                    "-var temperature $PBS_ARRAY_INDEX",
+                    "-log log.lammps.$PBS_ARRAY_INDEX",
+                    "OMP_NUM_THREADS=4"
+                ],
+                "step_description": "Runs the LAMMPS executable (lmp_mpi) with MPI, setting the number of OpenMP threads and passing the temperature variable from the job array index."
+            }
+        }
+    ]
+}

@@ -1,0 +1,33 @@
+{
+    "description": "Fine-tune a BERT model for named entity recognition (NER) using TensorFlow within a Singularity container on a GPU partition.",
+    "domain": [
+        "natural language processing",
+        "ai"
+    ],
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "containerized",
+                "tool_detected": "singularity"
+            },
+            "workload_class": {
+                "type": "ai_ml",
+                "primary_software": "python",
+                "executed_file": "finetune_bert_ner.py",
+                "parameters": [
+                    "--model-name=bert-base-uncased",
+                    "--fp16",
+                    "--batch-size=32",
+                    "--epochs=5",
+                    "--data-dir=/workspace/ner_data"
+                ],
+                "step_description": "Execute the fine-tuning script for BERT-based NER inside a Singularity container with GPU support."
+            }
+        }
+    ]
+}

@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: SLEPc
+  target_executable: eigensolver
+  workload_category: simulation_modeling
+compute_profile:
+- mpi
+- task_farming

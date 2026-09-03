@@ -1,0 +1,26 @@
+{
+    "description": "Run WRF simulation for hurricane modeling on SLURM cluster with MPI parallelization.",
+    "domain": "atmospheric science",
+    "steps": [
+        {
+            "step_id": 1,
+            "orchestration": {
+                "type": "standalone",
+                "tool_detected": null
+            },
+            "execution_environment": {
+                "type": "native",
+                "tool_detected": null
+            },
+            "workload_class": {
+                "type": "simulation",
+                "primary_software": "WRF",
+                "executed_file": "wrf.exe",
+                "parameters": [
+                    "-np 1152"
+                ],
+                "step_description": "Load WRF and OpenMPI modules, set environment variables, and execute WRF simulation with MPI."
+            }
+        }
+    ]
+}

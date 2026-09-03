@@ -1,0 +1,13 @@
+orchestration:
+  type: singular
+  tool_detected: null
+execution_environment:
+  type: bare_metal
+  tool_detected: null
+workload:
+  primary_software: python
+  target_executable: train_esm_mpi.py
+  workload_category: ai_ml
+compute_profile:
+- mpi
+- openmp
