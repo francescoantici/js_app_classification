@@ -47,8 +47,8 @@ if __name__ == "__main__":
                              help="Path to a folder whose files are all read as scripts")
 
     # System prompt path
-    parser.add_argument("--system_prompt", default="prompts/system_prompt.txt",
-                        help="Path to system prompt file (default: prompts/system_prompt.txt)")
+    parser.add_argument("--system_prompt", default="prompts/app_classification_prompt.txt",
+                        help="Path to system prompt file (default: prompts/app_classification_prompt.txt)")
 
     # Label output file
     parser.add_argument("--label_file", default="results/labels.csv",

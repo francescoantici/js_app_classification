@@ -15,7 +15,7 @@ This repo contains the code to execute application classification of job scripts
 	- **script.py:** Model for a generic job script.
 	- **script_characterization.py:** Data structure to parse the LLM output. It is used as the structure output for the LLM calls.
 - **prompts/**: Text prompt templates and system prompt for the LLM.
-	- **system_prompt.txt:** System-level instructions used when querying the LLM.
+	- **app_classification_prompt.txt:** System-level instructions used when querying the LLM.
 - **evaluation/**: Contains the evaluation scripts and results for a series of models.
 
 ## app_extraction.py - LLM-based Application Extraction
@@ -39,7 +39,7 @@ python app_extraction.py [OPTIONS]
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--system_prompt` | `prompts/system_prompt.txt` | Path to system prompt file |
+| `--system_prompt` | `prompts/app_classification_prompt.txt` | Path to system prompt file |
 | `--label_file` | `results/labels.csv` | Output CSV file for labels |
 | `--endpoint` | env variable | LLM endpoint URL (overrides `.env`) |
 | `--api_key` | env variable | API key for LLM (overrides `.env`) |

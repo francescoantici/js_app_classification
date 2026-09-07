@@ -49,8 +49,8 @@ if __name__ == "__main__":
                              help="Path to a folder whose files are all read as scripts")
 
     # System prompt path
-    parser.add_argument("--system_prompt", default="prompts/label_taxonomy_prompt.txt",
-                        help="Path to system prompt file (default: prompts/label_taxonomy_prompt.txt)")
+    parser.add_argument("--system_prompt", default="prompts/taxonomy_prompt.txt",
+                        help="Path to system prompt file (default: prompts/taxonomy_prompt.txt)")
 
     # Output folder, one yaml per script
     parser.add_argument("--label_folder", default="results/taxonomy_labels",
